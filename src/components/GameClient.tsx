@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Activity, ArrowRight, ArrowUpRight, Bell, BedDouble, CalendarDays, Check, ChevronRight, CircleDollarSign, Compass, Flame, Heart, MapPin, Music2, ScrollText, Sparkles, Star, Sun, Users, Wallet, X } from 'lucide-react';
+import { Activity, ArrowRight, ArrowUpRight, Bell, BedDouble, CalendarDays, Check, ChevronRight, CircleDollarSign, Compass, Flame, Heart, MapPin, Music2, ScrollText, Sparkles, Star, Sun, Smartphone, Users, Wallet, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import Phone from '@/components/Phone';
@@ -199,7 +199,7 @@ export default function GameClient() {
       <button className="nav-item nav-create" onClick={() => openNav('studio')}><Music2/><span>CREATE</span></button>
       <button className="nav-item" onClick={() => openNav('music')}><Activity/><span>MUSIC</span></button>
       <button className="nav-item" onClick={() => openNav('career')}><CalendarDays/><span>CAREER</span></button>
-      <button className="nav-item phone-nav" onClick={() => openNav('phone')}><div style={{ fontSize: 16, lineHeight: 1 }}>⌁</div><span>PHONE</span></button>
+      <button className={`nav-item phone-nav${phoneOpen ? ' is-open' : ''}`} onClick={() => openNav('phone')} aria-expanded={phoneOpen} aria-controls="in-game-phone"><Smartphone size={18} strokeWidth={1.8}/><span>PHONE</span></button>
     </nav>
     <Phone open={phoneOpen} setOpen={setPhoneOpen} onPanel={(value) => { setPhoneOpen(false); setPanel(value as PanelKey); }}/>
     <AnimatePresence>{panel && <Panel key={panel} kind={panel} close={() => setPanel(null)}/>}</AnimatePresence>

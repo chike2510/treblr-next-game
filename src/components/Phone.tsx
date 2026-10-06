@@ -1,11 +1,12 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, Bell, CalendarDays, Camera, CarFront, ChevronRight, CircleDollarSign, Headphones, MapPin, Music2, Settings, ShoppingBag, Users, X, Youtube, Instagram, MessageCircle, Video, Globe2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '@/lib/game';
 import PhoneDestinationScreen, { type PhoneScreen } from '@/components/PhoneScreens';
+import PhoneShader from '@/components/PhoneShader';
 
 const apps = [
   { name: 'Studio', icon: Headphones, color: 'linear-gradient(145deg,#f4a254,#df4e45)', panel: 'studio' },
@@ -59,11 +60,14 @@ export default function Phone({ open, setOpen, onPanel }: { open: boolean; setOp
     { name: 'Twitch', path: 'twitch', description: 'Live writing · local only', icon: '▣', background: 'linear-gradient(145deg,#a776ef,#5d43a6)' },
     { name: 'Snapchat', path: 'snapchat', description: 'Quick story · local only', icon: '◉', background: 'linear-gradient(145deg,#ffe658,#e6b92c)' },
   ];
-  return <AnimatePresence>{open && <motion.div className="phone-layer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-    <motion.div role="dialog" aria-modal="true" aria-label="In-game phone" className="phone-frame" initial={{ y: 45, opacity: 0, scale: .97 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 45, opacity: 0, scale: .97 }} transition={{ duration: .25 }}>
+  const reduceMotion = useReducedMotion();
+  return <AnimatePresence>{open && <motion.div className="phone-layer" initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: reduceMotion ? 1 : 0 }} transition={{ duration: reduceMotion ? 0 : .2 }}>
+    <motion.button type="button" className="phone-scrim" aria-label="Close phone and return to game" onClick={() => setOpen(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : .18 }}/>
+    <motion.div id="in-game-phone" role="dialog" aria-modal="true" aria-label="In-game phone" className="phone-frame" initial={reduceMotion ? false : { y: 110, opacity: 0, scale: .92 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={reduceMotion ? { opacity: 0 } : { y: 120, opacity: 0, scale: .92 }} transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 30 }}>
       <button ref={closeButtonRef} className="phone-dismiss" onClick={() => setOpen(false)} aria-label="Close phone"><X size={16}/></button>
       <div className="phone-top"><span>9:41</span><div className="dynamic-island"/><span>◔ ◈ ▰</span></div>
       <div className="phone-display">
+        <PhoneShader active={open}/>
         {screen === 'lock' && <button className="phone-lock" onClick={() => setScreen('home')}><div className="phone-clock">{game.time.replace(/ (AM|PM)/, '')}</div><div className="phone-date">DAY {game.day} · {game.currentCity.toUpperCase()}</div><div className="phone-widget"><div className="eyebrow">YOUR CITY · {game.currentCity.toUpperCase()}</div><strong>{game.notifications[0] || 'A new day is yours.'}</strong><span>{game.weather} · Keep the evening open.</span></div><div style={{ display: 'flex', gap: 10, width: '100%' }}><div className="phone-widget" style={{ margin: 0 }}><div className="eyebrow">NEXT UP</div><strong style={{ fontSize: 14 }}>{game.opportunities[0]?.title ?? 'A quiet day ahead'}</strong><span>{game.opportunities[0] ? `Through day ${game.opportunities[0].expiresOnDay} · ${game.opportunities[0].city ?? 'any city'}` : 'Make room for something new.'}</span></div></div><span className="phone-unlock">Tap anywhere to unlock</span></button>}
         {screen === 'home' && <><div className="phone-home-head"><div><div className="eyebrow" style={{ color: 'rgba(255,255,255,.6)' }}>{game.currentCity.toUpperCase()} · DAY {game.day}</div><h3>{game.time.includes('AM') ? 'Morning' : game.time.startsWith('12') || game.time.startsWith('1') || game.time.startsWith('2') || game.time.startsWith('3') || game.time.startsWith('4') || game.time.startsWith('5') ? 'Afternoon' : 'Evening'}, {game.artist.name}.</h3></div><button className="phone-back" onClick={() => setScreen('lock')}><Bell size={15}/></button></div><div className="app-grid">{apps.map((app) => <button className="phone-app" key={app.name} onClick={() => launch(app)}><span className="app-icon" style={{ background: app.color }}><app.icon size={22}/></span><span>{app.name}</span></button>)}</div><div className="phone-dock">{apps.slice(1, 5).map((app) => <button className="phone-app wide" key={app.name} onClick={() => launch(app)}><span className="app-icon" style={{ background: app.color }}><app.icon size={20}/></span></button>)}</div></>}
         {screen === 'messages' && <><ScreenHead title="Messages" back={() => setScreen('home')}/><div className="message-thread">{game.relationships.map((p) => <div className="message-card" key={p.name}><div className="message-person"><span className="avatar-bubble">{p.avatar}</span><div><b style={{ font: '600 11px var(--display)' }}>{p.name}</b><div style={{ fontSize: 8, color: 'rgba(255,255,255,.55)' }}>{p.role}</div></div></div><div>{p.note}</div><div className="phone-message-actions"><button className="phone-response" onClick={() => game.messagePerson(p.name, 'reply')}>Reply · keep talking</button><button className="phone-response" disabled={p.name === 'Teo Park' && game.currentCity !== 'Lagos' || game.money < 210 || game.energy < 12} onClick={() => game.messagePerson(p.name, 'accept-session')}>Book a session · $210</button><button className="phone-response subtle" onClick={() => game.messagePerson(p.name, 'decline')}>Pass politely</button></div></div>)}</div></>}
