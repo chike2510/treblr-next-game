@@ -4,15 +4,23 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
   applyOpportunityEffects,
+  addClockMinutes,
+  BOUTIQUE_ITEMS,
   canTransitionSong,
   CAMPAIGN_PLANS,
+  clockMinutes,
+  LAGOS_PLACES,
+  localRoute,
   migrateSaveData,
   opportunityBlockReason,
   resolveRelease,
+  socialPostRequirements,
   shouldExpireOpportunity,
   simulateDailyStreams,
   type CampaignTier,
   type Opportunity,
+  type LagosPlaceId,
+  type LocalTravelMode,
   type Song,
   type SongStatus,
 } from './game-rules';
@@ -41,6 +49,8 @@ type PersistentState = {
   weather: string;
   songs: Song[];
   relationships: { name: string; role: string; trust: number; note: string; avatar: string }[];
+  wardrobe: string[];
+  equippedLook: string;
   notifications: string[];
   opportunities: Opportunity[];
   posts: { platform: string; text: string; likes: number; time: string; mode?: string }[];
@@ -55,6 +65,8 @@ export type GameState = PersistentState & {
   advanceDay: () => void;
   eat: () => void;
   travel: (city: string) => void;
+  travelLocally: (place: LagosPlaceId, mode: LocalTravelMode) => void;
+  buyBoutiqueItem: (id: string) => void;
   createIdea: (draft: IdeaDraft) => void;
   recordSong: (id: string) => void;
   finishSong: (id: string, producer: 'Teo Park' | 'Self') => void;
@@ -72,7 +84,7 @@ export type GameState = PersistentState & {
 export const opportunityCatalog: Opportunity[] = [
   {
     id: 'festival', type: 'LIVE · LAGOS', title: 'Lagos Music Festival',
-    detail: 'Golden-hour main-stage slot. Your first crowd this size.', cost: 420, city: 'Lagos', expiresOnDay: 12, tone: 'gold',
+    detail: 'Golden-hour main-stage slot. Your first crowd this size.', cost: 420, city: 'Lagos', location: 'Freedom Park Stage', availableFrom: '4:00 PM', availableUntil: '10:00 PM', expiresOnDay: 12, tone: 'gold',
     effects: { cash: 3200, fans: 50000, hype: 7, reputation: 4, energy: -17 },
   },
   {
@@ -89,7 +101,7 @@ export const opportunityCatalog: Opportunity[] = [
     id: 'campaign', type: 'BRAND · INBOUND', title: 'Northstar Studio campaign',
     detail: 'A small independent label wants you in their fall film.', cost: 0, expiresOnDay: 10, tone: 'gold',
     effects: { cash: 8500, fans: 12000, hype: 5, reputation: 3, energy: 0 },
-    requirements: { minReputation: 60 },
+    requirements: { minReputation: 60, songStatus: 'RELEASED' },
   },
 ];
 
@@ -108,13 +120,11 @@ const initialState: PersistentState = {
     { name: 'Maya Ellis', role: 'Singer · creative spark', trust: 76, note: 'Your snippet found its way onto my For You.', avatar: 'ME' },
     { name: 'Seyi Vibe', role: 'Artist · Atlanta collaborator', trust: 68, note: 'Atlanta could be special. Come through when you’re ready.', avatar: 'SV' },
   ],
-  notifications: ['Your snippet is finding listeners in Accra', 'Teo sent you a message', 'Lagos Music Festival added a stage'],
+  notifications: ['Teo sent you a message', 'Lagos Music Festival added a stage'],
   opportunities: opportunityCatalog,
-  posts: [
-    { platform: 'Instagram', text: 'last night is still ringing in my head. lagos, you were everything.', likes: 18420, time: '2h' },
-    { platform: 'TikTok', text: 'the voice note that started Never Met You 🎙️', likes: 62800, time: '5h' },
-    { platform: 'X', text: 'making the kind of music i needed when i was 16.', likes: 2910, time: '1d' },
-  ],
+  posts: [],
+  wardrobe: [],
+  equippedLook: 'city-basics',
   ledger: [
     { id: 'seed-ledger-1', day: 5, description: 'Last royalty payout · catalog', amount: 680, balanceAfter: 4320, bucket: 'cash' },
     { id: 'seed-ledger-2', day: 5, description: 'Studio session · Better Days', amount: -125, balanceAfter: 3640, bucket: 'cash' },
@@ -219,6 +229,22 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     const detail = `You made it to ${city}. ${city === 'Atlanta' ? 'Seyi’s late session is close by; the city has a different rhythm.' : 'New streets, new possibilities.'} −$420 · −15 energy.`;
     return { ...next, ...recordEvent(next, `Arrived in ${city}`, detail, `Landed in ${city}. The city feels different after dark.`), ledger: ledgerEntry(state, `Travel · ${state.currentCity} to ${city}`, -420, 'cash', state.money - 420) };
   }),
+  travelLocally: (destination, mode) => set((state) => {
+    if (state.currentCity !== 'Lagos') return { lastEvent: 'The neighborhood map is ready in Lagos. Travel home first to use these local stops.' };
+    const place = LAGOS_PLACES.find((item) => item.id === destination);
+    if (!place) return { lastEvent: 'That stop is not on this local map.' };
+    const origin = LAGOS_PLACES.find((item) => item.name === state.currentLocation)?.id ?? 'apartment';
+    if (origin === destination) return { lastEvent: `You are already at ${place.name}.` };
+    const route = localRoute(origin, destination, mode);
+    if (state.money < route.fare) return { lastEvent: `You need $${route.fare} cash for that ${route.mode.toLowerCase()} ride.` };
+    if (state.energy < route.energy) return { lastEvent: `You need ${route.energy} energy to walk that route. Take a ride or rest first.` };
+    if (destination !== 'apartment' && clockMinutes(state.time) + route.minutes > clockMinutes('10:30 PM')) return { lastEvent: 'It is getting late to head farther out. Go home, or try this trip tomorrow.' };
+    const next = { ...state, currentLocation: place.name, money: state.money - route.fare, energy: clamp(state.energy - route.energy), time: addClockMinutes(state.time, route.minutes) };
+    const fareCopy = route.fare ? ` · −$${route.fare}` : '';
+    const energyCopy = route.energy ? ` · −${route.energy} energy` : '';
+    const detail = `${route.mode} from ${state.currentLocation} to ${place.name} · ${route.minutes} minutes${fareCopy}${energyCopy}.`;
+    return { ...next, ...recordEvent(next, `Across Lagos · ${place.name}`, detail, `You reached ${place.name} in ${route.minutes} minutes.`), ledger: route.fare ? ledgerEntry(state, `${route.mode} · ${place.name}`, -route.fare, 'cash', state.money - route.fare) : state.ledger };
+  }),
   createIdea: (draft) => set((state) => {
     const title = draft.title.trim();
     if (!title) return { lastEvent: 'Give the idea a working title first.' };
@@ -282,16 +308,7 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     const copy = text.trim();
     if (!copy) return { lastEvent: 'Add a little context before you share it.' };
     const normalized = platform.toLowerCase();
-    const costs: Record<string, { cash: number; energy: number; reach: number }> = {
-      instagram: { cash: 0, energy: 2, reach: 8200 }, tiktok: { cash: 0, energy: 6, reach: 16800 }, x: { cash: 0, energy: 1, reach: 2300 },
-      youtube: { cash: 180, energy: 10, reach: 6200 }, twitch: { cash: 0, energy: 14, reach: 5600 }, snapchat: { cash: 0, energy: 3, reach: 4300 },
-      soundcloud: { cash: 0, energy: 2, reach: 5900 }, audiomack: { cash: 0, energy: 2, reach: 4800 }, threads: { cash: 0, energy: 1, reach: 2800 },
-      facebook: { cash: 0, energy: 2, reach: 3900 }, 'apple music': { cash: 0, energy: 0, reach: 3400 }, spotify: { cash: 0, energy: 0, reach: 0 },
-    };
-    let profile = costs[normalized] ?? { cash: 0, energy: 2, reach: 2500 };
-    if (normalized === 'youtube') profile = mode === 'interview' ? { cash: 80, energy: 5, reach: 4200 } : mode === 'live' ? { cash: 0, energy: 14, reach: 5400 } : { cash: 180, energy: 10, reach: 6200 };
-    if (normalized === 'facebook' && mode === 'event') profile = { cash: 0, energy: 3, reach: 5200 };
-    if (normalized === 'twitch' && mode === 'community') profile = { cash: 0, energy: 2, reach: 2600 };
+    const profile = socialPostRequirements(platform, mode);
     if (state.money < profile.cash) return { lastEvent: `This ${platform} video needs $${profile.cash} for production.` };
     if (state.energy < profile.energy) return { lastEvent: `${platform} needs ${profile.energy} energy for this kind of moment.` };
     const modeMultiplier = mode === 'trend-reply' ? 0.72 : mode === 'story' ? 0.78 : mode === 'live' ? 1.2 : mode === 'video' ? 1.24 : mode === 'snippet' ? 1.3 : mode === 'repost' ? 1.18 : mode === 'backstage' ? 1.08 : mode === 'event' ? 1.12 : mode === 'interview' ? 1.08 : 1;
@@ -364,6 +381,15 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     const detail = `${description} · −$${cost.toLocaleString()}.`;
     return { ...next, ...recordEvent(next, description, detail), ledger: ledgerEntry(state, description, -cost, 'cash', state.money - cost) };
   }),
+  buyBoutiqueItem: (id) => set((state) => {
+    const item = BOUTIQUE_ITEMS.find((candidate) => candidate.id === id);
+    if (!item) return { lastEvent: 'That piece is not in the boutique today.' };
+    if (state.wardrobe.includes(item.id)) return { lastEvent: `${item.name} is already in your wardrobe.` };
+    if (state.money < item.price) return { lastEvent: `You need $${item.price.toLocaleString()} cash for ${item.name}.` };
+    const next = { ...state, money: state.money - item.price, wardrobe: [...state.wardrobe, item.id], equippedLook: item.id, mood: clamp(state.mood + 2) };
+    const detail = `${item.name} added to your wardrobe and picked out for tonight · −$${item.price.toLocaleString()}.`;
+    return { ...next, ...recordEvent(next, `A new piece · ${item.name}`, detail), ledger: ledgerEntry(state, `Boutique · ${item.name}`, -item.price, 'cash', next.money) };
+  }),
   transferMoney: (amount, direction) => set((state) => {
     const value = Math.floor(Number(amount));
     if (!Number.isFinite(value) || value <= 0) return { lastEvent: 'Choose an amount greater than zero.' };
@@ -385,7 +411,7 @@ export const useGame = create<GameState>()(persist((set, get) => ({
   storage: createJSONStorage(() => localStorage),
   migrate: (persisted, _version) => migrateSaveData(persisted, initialForMigration, opportunityCatalog) as unknown as GameState,
   partialize: (state) => {
-    const { sleep: _sleep, advanceDay: _advanceDay, eat: _eat, travel: _travel, createIdea: _createIdea, recordSong: _recordSong, finishSong: _finishSong, scheduleSong: _scheduleSong, archiveSong: _archiveSong, publishPost: _publishPost, acceptOpportunity: _acceptOpportunity, messagePerson: _messagePerson, dismissEvent: _dismissEvent, spend: _spend, transferMoney: _transferMoney, reset: _reset, ...data } = state;
+    const { sleep: _sleep, advanceDay: _advanceDay, eat: _eat, travel: _travel, travelLocally: _travelLocally, buyBoutiqueItem: _buyBoutiqueItem, createIdea: _createIdea, recordSong: _recordSong, finishSong: _finishSong, scheduleSong: _scheduleSong, archiveSong: _archiveSong, publishPost: _publishPost, acceptOpportunity: _acceptOpportunity, messagePerson: _messagePerson, dismissEvent: _dismissEvent, spend: _spend, transferMoney: _transferMoney, reset: _reset, ...data } = state;
     return data as GameState;
   },
 }));

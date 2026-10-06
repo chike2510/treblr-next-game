@@ -5,6 +5,7 @@ import { Activity, ArrowRight, ArrowUpRight, Bell, BedDouble, CalendarDays, Chec
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import Phone from '@/components/Phone';
+import { LagosMapSketch } from '@/components/PhoneScreens';
 import WorldRoom from '@/components/WorldRoom';
 import { CAMPAIGN_PLANS, opportunityBlockReason, type Opportunity, type Song } from '@/lib/game-rules';
 import { useGame } from '@/lib/game';
@@ -89,7 +90,7 @@ function Panel({ kind, close }: { kind: PanelKey; close: () => void }) {
           <div className="mini-stat-grid"><div className="mini-stat"><span>REPUTATION</span><b>{game.reputation}/100</b></div><div className="mini-stat"><span>HYPE</span><b>{game.hype}%</b></div><div className="mini-stat"><span>OPEN CONVERSATIONS</span><b>{game.relationships.length}</b></div></div>
         </>}
         {kind === 'world' && <>
-          <div className="map-strip"><div className="map-pin p1"/><div className="map-pin p2"/><div className="map-pin p3"/><div className="map-label">{game.currentCity.toUpperCase()} · DAY {game.day}</div></div>
+          {game.currentCity === 'Lagos' ? <div className="panel-local-map"><div><div className="eyebrow">YABA → LAGOS ISLAND · READY NOW</div><p>Tap a stop to walk there. This map is drawn in the app and updates your saved location, time, and energy.</p></div><LagosMapSketch onWalk={(place) => game.travelLocally(place, 'walk')}/></div> : <div className="quote-note panel-nonlagos-map"><div className="eyebrow">YOUR LAGOS NEIGHBORHOOD</div><p>The local map is waiting back in Lagos. Your {game.currentCity} room stays saved while you travel.</p><button className="pill-button orange" onClick={() => game.travel('Lagos')}>RETURN TO LAGOS · $420 + 15 ENERGY</button></div>}
           <div className="quote-note city-distinction-note"><b>{game.currentCity === 'Atlanta' ? 'ATLANTA · THE LOCAL SCENE' : 'LAGOS · YOUR HOME SCENE'}</b><p>{game.currentCity === 'Atlanta' ? 'Seyi Vibe’s late session is here. The collaboration opportunity is only valid in Atlanta; the city changes what you can do, not just the label on the map.' : 'The Lagos Music Festival and Teo Park’s finishing room are local. Travel costs $420 cash and 15 energy; your save and relationships travel with you.'}</p></div>
           <div className="city-grid">{cities.map((city) => <article className="city-card" key={city.name}><div><div className="eyebrow" style={{ color: '#f6c28d' }}>{city.accent}</div><h3>{city.name}</h3><p>{city.tag}</p></div><button disabled={city.name === game.currentCity || game.money < 420 || game.energy < 15} onClick={() => game.travel(city.name)}>{city.name === game.currentCity ? 'YOU ARE HERE' : 'TRAVEL · $420 + 15 ENERGY'}</button></article>)}</div>
         </>}
