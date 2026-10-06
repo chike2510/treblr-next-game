@@ -1,12 +1,13 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Activity, ArrowRight, ArrowUpRight, Bell, BedDouble, CalendarDays, Check, ChevronRight, CircleDollarSign, Compass, Flame, Heart, MapPin, Music2, ScrollText, Sparkles, Star, Sun, Smartphone, Users, Wallet, X } from 'lucide-react';
+import { Activity, ArrowRight, ArrowUpRight, Bell, BedDouble, CalendarDays, Check, ChevronRight, CircleDollarSign, Compass, Flame, Heart, MapPin, Music2, ScrollText, Sparkles, Star, Sun, Smartphone, Users, Wallet, X, Moon } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import Phone from '@/components/Phone';
 import { LagosMapSketch } from '@/components/PhoneScreens';
-import WorldRoom from '@/components/WorldRoom';
+import WorldRoom, { roomSpots } from '@/components/WorldRoom';
 import { CAMPAIGN_PLANS, opportunityBlockReason, type Opportunity, type Song } from '@/lib/game-rules';
 import { useGame } from '@/lib/game';
 
@@ -30,12 +31,6 @@ const cities = [
 const money = (value: number) => `${value >= 0 ? '+' : '−'}$${Math.abs(value).toLocaleString()}`;
 const cash = (value: number) => `$${Math.round(value).toLocaleString()}`;
 const short = (value: number) => value >= 1_000_000 ? `${(value / 1_000_000).toFixed(1)}M` : `${Math.round(value / 1000)}K`;
-const getCityDescription = (city: string) => city === 'Atlanta'
-  ? 'A low ceiling, a late beat, and Seyi’s loft across the street. This city asks what happens when you make room for somebody else.'
-  : city === 'Lagos'
-    ? 'The rain is easing over the city. Teo found a new pocket for the hook, and the evening is still yours to shape.'
-    : `${city} has its own rhythm tonight. The apartment is new, the next conversation is yours to begin.`;
-
 function Panel({ kind, close }: { kind: PanelKey; close: () => void }) {
   const game = useGame();
   const dialogRef = useRef<HTMLElement>(null);
@@ -75,7 +70,7 @@ function Panel({ kind, close }: { kind: PanelKey; close: () => void }) {
 
   return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
     <motion.section ref={dialogRef} className="game-panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" aria-describedby="panel-description" initial={{ opacity: 0, y: 20, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 15, scale: .99 }} transition={{ duration: .2 }}>
-      <div className="panel-head"><div><div className="eyebrow" style={{ color: '#b16d48' }}>{meta.kicker}</div><h2 id="panel-title">{meta.title}</h2><p id="panel-description" className="panel-sub">{meta.sub}</p></div><button ref={closeRef} className="close-button" onClick={close} aria-label="Close dialog"><X size={17}/></button></div>
+      <div className="panel-head"><div><h2 id="panel-title">{meta.title}</h2><p id="panel-description" className="panel-sub">{meta.sub}</p></div><button ref={closeRef} className="close-button" onClick={close} aria-label="Close dialog"><X size={17}/></button></div>
       <div className="panel-content">
         {kind === 'studio' && <>
           <div className="object-stage"><div className="stage-quote">“The hook arrives before the words do.”</div></div>
@@ -137,6 +132,7 @@ export default function GameClient() {
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [toast, setToast] = useState('');
   const game = useGame();
+  const router = useRouter();
   useEffect(() => { void useGame.persist.rehydrate(); }, []);
   useEffect(() => {
     if (game.lastEvent) { setToast(game.lastEvent); const timer = window.setTimeout(() => { setToast(''); game.dismissEvent(); }, 4300); return () => window.clearTimeout(timer); }
@@ -160,46 +156,63 @@ export default function GameClient() {
   const openNav = (key: 'home' | 'world' | 'music' | 'career' | 'phone' | 'studio' | 'history') => {
     if (key === 'home') { setPanel(null); setPhoneOpen(false); return; }
     if (key === 'phone') { setPhoneOpen(true); return; }
-    if (key === 'studio') { window.location.assign('/studio'); return; }
+    if (key === 'studio') { router.push('/studio'); return; }
     if (key === 'history') { setPanel('history'); return; }
     setPanel(key === 'world' ? 'world' : key === 'music' ? 'music' : 'career');
   };
-  const cityOverlay: Record<string, string> = {
-    Lagos: 'linear-gradient(132deg,rgba(63,37,45,.12),rgba(235,132,83,.16))',
-    Atlanta: 'linear-gradient(132deg,rgba(24,40,64,.34),rgba(202,126,72,.2))',
-    London: 'linear-gradient(132deg,rgba(50,61,81,.36),rgba(173,157,149,.12))',
-    Tokyo: 'linear-gradient(132deg,rgba(31,48,83,.35),rgba(214,83,107,.19))',
-  };
   const fanLabel = short(game.fans);
-  const scenePrompt = game.currentCity === 'Atlanta' ? 'Seyi’s session is open tonight' : game.opportunities.some((offer) => !opportunityBlockReason(offer, game)) ? 'An opportunity is ready for you' : game.songs.some((song) => song.status === 'FINISHED') ? 'A master is ready to release' : `Day ${game.day} is still yours to shape`;
+  const readyOffer = game.opportunities.some((offer) => !opportunityBlockReason(offer, game));
+  const objective: { text: string; panel: PanelKey } = game.currentCity === 'Atlanta'
+    ? { text: 'Seyi’s session is open tonight', panel: 'career' }
+    : readyOffer ? { text: 'An offer is ready to take', panel: 'career' }
+    : game.songs.some((song) => song.status === 'FINISHED') ? { text: 'A master is ready to release', panel: 'music' }
+    : { text: `Day ${game.day} is still yours to shape`, panel: 'career' };
+  const moodWord = game.mood > 78 ? 'Good' : game.mood > 48 ? 'Steady' : 'Low';
+  const spots = roomSpots(game.currentCity);
 
   return <main className="game-shell">
     <div className="world-plate" data-city={game.currentCity}/>
     <div className="world-vignette"/>
-    <div className="game-ui">
-      <header className="game-header">
-        <div className="brand-lockup"><div className="brand-mark">T.</div><div><div className="brand-word">TREBLR</div><div className="eyebrow brand-subline">LIFE IN THE MUSIC</div></div></div>
-        <div className="world-chip"><MapPin size={13} color="#ffc48a"/><span>{game.currentCity}</span><i className="chip-separator"/><span>DAY {game.day} · {game.time}</span><i className="chip-separator"/><span>{game.weather.split('·')[0].trim()}</span></div>
-        <div className="header-right"><button className="icon-button" aria-label={`Open notifications, ${game.notifications.length} recent`} onClick={() => setPanel('notifications')}><Bell size={17}/></button><button className="icon-button" aria-label="Open activity history" onClick={() => setPanel('history')}><ScrollText size={16}/></button><button className="avatar-menu" onClick={() => setPanel('profile')}><span className="avatar-bubble">C</span><span>{game.artist.name}</span></button></div>
+    <WorldRoom city={game.currentCity} currentLocation={game.currentLocation} onInteract={interact}/>
+    <div className="hud">
+      <header className="hud-top">
+        <div className="hud-left">
+          <div className="hud-brand"><span className="hud-brand-mark">T.</span><span className="hud-brand-word">TREBLR</span></div>
+          <section className="hud-place" aria-label="Where you are">
+            <div className="hud-place-where">{game.currentLocation} · {game.currentCity}</div>
+            <div className="hud-place-when"><span className="hud-day">Day {game.day}</span><span className="mono">{game.time}</span><span className="hud-weather">{game.weather.split('·')[0].trim()}</span></div>
+            <button type="button" className="hud-goal" onClick={() => setPanel(objective.panel)}><span className="hud-goal-dot" aria-hidden="true"/><span>{objective.text}</span><ChevronRight size={14} aria-hidden="true"/></button>
+          </section>
+        </div>
+        <div className="hud-right">
+          <dl className="hud-stats" aria-label="Your stats">
+            <div className="hud-stat"><dt>Cash</dt><dd className="mono">{cash(game.money)}</dd></div>
+            <div className="hud-stat"><dt>Energy</dt><dd className="mono">{game.energy}</dd><i className="hud-bar" aria-hidden="true"><b style={{ width: `${game.energy}%` }}/></i></div>
+            <div className="hud-stat"><dt>Hype</dt><dd className="mono">{game.hype}</dd><i className="hud-bar" aria-hidden="true"><b style={{ width: `${game.hype}%` }}/></i></div>
+            <div className="hud-stat hud-stat--mood"><dt>Mood</dt><dd>{moodWord}</dd><i className="hud-bar" aria-hidden="true"><b style={{ width: `${game.mood}%` }}/></i></div>
+            <div className="hud-stat"><dt>Fans</dt><dd className="mono">{fanLabel}</dd></div>
+          </dl>
+          <div className="hud-actions">
+            <button type="button" className="hud-icon" aria-label={`Open notifications, ${game.notifications.length} recent`} onClick={() => setPanel('notifications')}><Bell size={17}/>{game.notifications.length > 0 && <span className="hud-badge" aria-hidden="true"/>}</button>
+            <button type="button" className="hud-icon hud-icon--history" aria-label="Open activity history" onClick={() => setPanel('history')}><ScrollText size={16}/></button>
+            <button type="button" className="hud-avatar" aria-label={`Open profile for ${game.artist.name}`} onClick={() => setPanel('profile')}><span>{game.artist.name.charAt(0)}</span></button>
+          </div>
+        </div>
       </header>
-      <WorldRoom city={game.currentCity} currentLocation={game.currentLocation} onInteract={interact}/>
-      <div className="scene-title"><div className="scene-kicker eyebrow"><i/> {game.currentLocation.toUpperCase()} · DAY {game.day} <Sun size={12}/></div><h1>Make a life<br/>that sounds<br/><em>{game.currentCity === 'Lagos' ? 'like you.' : `like ${game.currentCity}.`}</em></h1><p>{getCityDescription(game.currentCity)}</p></div>
-      <button className="scene-prompt" onClick={() => setPanel(game.currentCity === 'Atlanta' ? 'career' : 'career')} aria-label={`Open opportunity: ${scenePrompt}`}><span className="pulse-dot"/>{scenePrompt}<ChevronRight size={13}/></button>
-      <div className="bottom-stage"><div className="quick-status">
-        <div className="status-pill"><Heart className="status-icon" size={15}/><div><div className="status-label">ENERGY</div><div className="status-value">{game.energy}%</div><div className="status-meter"><i style={{ width: `${game.energy}%` }}/></div></div></div>
-        <div className="status-pill"><Sparkles className="status-icon" size={15}/><div><div className="status-label">MOOD</div><div className="status-value">{game.mood > 78 ? 'In a good place' : game.mood > 48 ? 'Finding the groove' : 'Need a breather'}</div></div></div>
-        <div className="status-pill"><Flame className="status-icon" size={15}/><div><div className="status-label">HYPE</div><div className="status-value">{game.hype}%</div><div className="status-meter"><i style={{ width: `${game.hype}%` }}/></div></div></div>
-        <div className="status-pill money-pill"><Wallet className="status-icon" size={15}/><div><div className="status-label">CASH · BANK</div><div className="status-value">${game.money.toLocaleString()} <span className="bank-inline">· ${(game.bank / 1000).toFixed(0)}K</span></div></div></div>
-        <div className="status-pill audience-pill"><Users className="status-icon" size={15}/><div><div className="status-label">AUDIENCE</div><div className="status-value">{fanLabel} fans</div></div></div>
-      </div><div className="stage-nudge-wrap"><p className="stage-nudge">A day of streams, income and deadlines moves together.</p><button className="pill-button small stage-day-button" onClick={game.advanceDay}><Check size={12}/> END DAY · DAY {game.day}</button></div></div>
+      <div className="hud-bottom">
+        <div className="here-tray" aria-label="In the apartment">
+          {spots.filter((spot) => spot.id !== 'bed' && spot.id !== 'phone').map(({ id, label, icon: Icon }) => <button type="button" key={id} className="here-chip" onClick={() => interact(id)}><Icon size={15} aria-hidden="true"/>{label}</button>)}
+        </div>
+        <button type="button" className="btn-primary end-day" onClick={game.advanceDay}><Moon size={15} aria-hidden="true"/>End day {game.day}</button>
+      </div>
     </div>
     <nav className="bottom-nav" aria-label="Game navigation">
-      <button className="nav-item active" onClick={() => openNav('home')}><BedDouble/><span>HOME</span></button>
-      <button className="nav-item" onClick={() => openNav('world')}><Compass/><span>WORLD</span></button>
-      <button className="nav-item nav-create" onClick={() => openNav('studio')}><Music2/><span>CREATE</span></button>
-      <button className="nav-item" onClick={() => openNav('music')}><Activity/><span>MUSIC</span></button>
-      <button className="nav-item" onClick={() => openNav('career')}><CalendarDays/><span>CAREER</span></button>
-      <button className={`nav-item phone-nav${phoneOpen ? ' is-open' : ''}`} onClick={() => openNav('phone')} aria-expanded={phoneOpen} aria-controls="in-game-phone"><Smartphone size={18} strokeWidth={1.8}/><span>PHONE</span></button>
+      <button className="nav-item active" onClick={() => openNav('home')}><BedDouble/><span>Home</span></button>
+      <button className="nav-item" onClick={() => openNav('world')}><Compass/><span>World</span></button>
+      <button className="nav-item" onClick={() => openNav('studio')}><Music2/><span>Create</span></button>
+      <button className="nav-item" onClick={() => openNav('music')}><Activity/><span>Music</span></button>
+      <button className="nav-item" onClick={() => openNav('career')}><CalendarDays/><span>Career</span></button>
+      <button className={`nav-item phone-nav${phoneOpen ? ' is-open' : ''}`} onClick={() => openNav('phone')} aria-expanded={phoneOpen} aria-controls="in-game-phone"><Smartphone/><span>Phone</span></button>
     </nav>
     <Phone open={phoneOpen} setOpen={setPhoneOpen} onPanel={(value) => { setPhoneOpen(false); setPanel(value as PanelKey); }}/>
     <AnimatePresence>{panel && <Panel key={panel} kind={panel} close={() => setPanel(null)}/>}</AnimatePresence>
