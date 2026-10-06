@@ -1,0 +1,21 @@
+/* /world page postcards. */
+
+/* /world page postcards */
+.postcard-card {
+  position: relative; overflow: hidden;
+  min-height: 220px;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 4px;
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  background-size: cover; background-position: center;
+  color: var(--bone);
+  isolation: isolate;
+}
+.postcard-card::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(0deg, rgba(14, 13, 12, .9), rgba(14, 13, 12, .1) 75%); }
+.postcard-card.is-here { outline: 2px solid var(--danfo); outline-offset: -2px; }
+.postcard-card .postcard-name { margin: 0 0 0 -2px; font-size: 44px; }
+.postcard-card p { margin: 0 0 var(--s-2); font-size: var(--fs-sm); color: var(--bone); opacity: .85; }
+.postcard-card .world-city-action { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); font-size: var(--fs-sm); }
+.postcard-card .btn-primary, .postcard-card .btn-secondary { min-height: 36px; padding: 0 var(--s-3); font-size: var(--fs-sm); }
+.postcard-card .btn-secondary { color: var(--bone); }
+

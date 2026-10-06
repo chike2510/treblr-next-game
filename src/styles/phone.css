@@ -1,0 +1,25 @@
+/* TREBLR OS phone. */
+
+/* --------------------------------------------------------------------------
+   Phone: opaque widgets, game-time status bar
+   -------------------------------------------------------------------------- */
+.phone-frame { border-color: var(--concrete); background: var(--asphalt); }
+.phone-top { display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-sm); color: var(--bone); }
+.phone-top-city { color: var(--dust); margin-right: 52px; }
+.phone-widget { background: var(--soot); border: 1px solid var(--line-dark); border-radius: var(--r-md); backdrop-filter: none; }
+.app-icon { border-radius: var(--r-md); box-shadow: none; }
+
+/* phone: TREBLR OS */
+.phone-display { background-size: cover; background-position: center; }
+.phone-shader { opacity: .16; }
+.app-grid { grid-template-columns: repeat(3, 1fr); gap: var(--s-5) var(--s-3); }
+.phone-app > span:last-child { font: 500 var(--fs-sm)/1.2 var(--body); color: var(--bone); }
+.app-icon { width: 60px; height: 60px; border-radius: var(--r-md); color: var(--ink); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .18); }
+.app-tone-people { background: var(--lagoon); color: var(--bone); }
+.app-tone-money { background: var(--danfo); }
+.app-tone-make { background: var(--signal); color: var(--bone); }
+.app-tone-move { background: var(--sodium); }
+.app-tone-system { background: var(--concrete); color: var(--bone); }
+.phone-social-logo { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--concrete); color: var(--bone); font: 600 var(--fs-sm)/1 var(--mono-font); }
+.phone-social-card { border-radius: var(--r-md); background: var(--soot); border: 1px solid var(--line-dark); }
+
