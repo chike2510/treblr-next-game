@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Space_Grotesk } from 'next/font/google';
+import { Anton, Archivo, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import './theme.css';
 
-const display = Space_Grotesk({ subsets: ['latin'], variable: '--font-display', display: 'swap' });
-const body = DM_Sans({ subsets: ['latin'], variable: '--font-body', display: 'swap' });
+const poster = Anton({ subsets: ['latin'], weight: '400', variable: '--font-poster', display: 'swap' });
+const ui = Archivo({ subsets: ['latin'], axes: ['wdth'], variable: '--font-ui', display: 'swap' });
+const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'TREBLR — An artist’s life, on your terms',
@@ -12,5 +14,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`${display.variable} ${body.variable}`}><body>{children}</body></html>;
+  return <html lang="en" className={`${poster.variable} ${ui.variable} ${mono.variable}`}><body>{children}</body></html>;
 }
