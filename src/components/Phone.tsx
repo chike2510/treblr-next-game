@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, Bell, CalendarDays, Camera, CarFront, ChevronRight, CircleDollarSign, Headphones, MapPin, Settings, Users, X, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Bell, CalendarDays, Camera, CarFront, ChevronRight, CircleDollarSign, Headphones, MapPin, Settings, Users, X, MessageCircle, Star } from 'lucide-react';
 import { cityByName } from '@/lib/cities';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -10,13 +10,14 @@ import PhoneDestinationScreen, { type PhoneScreen } from '@/components/PhoneScre
 import PhoneShader from '@/components/PhoneShader';
 
 type AppTone = 'people' | 'money' | 'make' | 'move' | 'system';
-/** TREBLR OS: nine apps, no duplicates, four category tones instead of a rainbow. */
+/** TREBLR OS: focused apps, no duplicates, five category tones instead of a rainbow. */
 const apps: { name: string; icon: typeof Headphones; tone: AppTone; screen?: string; panel?: string }[] = [
   { name: 'Messages', icon: MessageCircle, tone: 'people', screen: 'messages' },
   { name: 'Social', icon: Camera, tone: 'people', screen: 'social' },
   { name: 'Team', icon: Users, tone: 'people', screen: 'team' },
   { name: 'Studio', icon: Headphones, tone: 'make', panel: 'studio' },
   { name: 'Bank', icon: CircleDollarSign, tone: 'money', screen: 'bank' },
+  { name: 'Tonight', icon: Star, tone: 'people', screen: 'shows' },
   { name: 'Calendar', icon: CalendarDays, tone: 'money', screen: 'calendar' },
   { name: 'Map', icon: MapPin, tone: 'move', screen: 'map' },
   { name: 'Rides', icon: CarFront, tone: 'move', screen: 'rides' },

@@ -29,6 +29,14 @@ export type { CampaignTier, Opportunity, Song, SongStatus } from './game-rules';
 export type LedgerEntry = { id: string; day: number; description: string; amount: number; balanceAfter: number; bucket: 'cash' | 'bank' };
 export type HistoryEntry = { id: string; day: number; time: string; title: string; detail: string };
 export type RelationshipChoice = 'reply' | 'accept-session' | 'decline' | 'help';
+export type NightMood = 'low-key' | 'social' | 'high-energy';
+export type EventNightPlan = {
+  eventId: 'festival'; stage: 'shared' | 'arrived' | 'attended' | 'recorded'; people: string[]; mood: NightMood; budget: number; day: number; sharedAt: string;
+  ride?: { mode: LocalTravelMode; fare: number; minutes: number; from: string; arrivalTime: string };
+  ticketId?: string; memoryId?: string;
+};
+export type EventPass = { id: string; eventId: 'festival'; eventTitle: string; passType: 'Artist pass'; venue: string; day: number; time: string; entryCost: number; rideMode?: LocalTravelMode; simulationOnly: true };
+export type MemoryRecord = { id: string; passId: string; eventId: 'festival'; title: string; location: string; day: number; time: string; people: string[]; mood?: NightMood; note: string };
 type IdeaDraft = { title: string; genre: string; mood: string; bpm: number; inspiration: string };
 
 type PersistentState = {
@@ -56,6 +64,9 @@ type PersistentState = {
   posts: { platform: string; text: string; likes: number; time: string; mode?: string }[];
   ledger: LedgerEntry[];
   history: HistoryEntry[];
+  eventNight: EventNightPlan | null;
+  passes: EventPass[];
+  memories: MemoryRecord[];
   chapterStage: string;
   lastEvent: string;
 };
@@ -66,6 +77,8 @@ export type GameState = PersistentState & {
   eat: () => void;
   travel: (city: string) => void;
   travelLocally: (place: LagosPlaceId, mode: LocalTravelMode) => void;
+  shareEventPlan: (plan: { people: string[]; mood: NightMood; budget: number }) => void;
+  saveEventMemory: (note: string) => void;
   buyBoutiqueItem: (id: string) => void;
   createIdea: (draft: IdeaDraft) => void;
   recordSong: (id: string) => void;
@@ -123,6 +136,9 @@ const initialState: PersistentState = {
   notifications: ['Teo sent you a message', 'Lagos Music Festival added a stage'],
   opportunities: opportunityCatalog,
   posts: [],
+  eventNight: null,
+  passes: [],
+  memories: [],
   wardrobe: [],
   equippedLook: 'city-basics',
   ledger: [
@@ -234,16 +250,62 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     const place = LAGOS_PLACES.find((item) => item.id === destination);
     if (!place) return { lastEvent: 'That stop is not on this local map.' };
     const origin = LAGOS_PLACES.find((item) => item.name === state.currentLocation)?.id ?? 'apartment';
-    if (origin === destination) return { lastEvent: `You are already at ${place.name}.` };
+    if (origin === destination) {
+      if (destination === 'venue' && state.eventNight?.stage === 'shared') {
+        return { eventNight: { ...state.eventNight, stage: 'arrived', ride: { mode, fare: 0, minutes: 0, from: state.currentLocation, arrivalTime: state.time } }, lastEvent: 'Your shared plan is at Freedom Park. The live set is ready when you are.' };
+      }
+      return { lastEvent: `You are already at ${place.name}.` };
+    }
     const route = localRoute(origin, destination, mode);
     if (state.money < route.fare) return { lastEvent: `You need $${route.fare} cash for that ${route.mode.toLowerCase()} ride.` };
     if (state.energy < route.energy) return { lastEvent: `You need ${route.energy} energy to walk that route. Take a ride or rest first.` };
     if (destination !== 'apartment' && clockMinutes(state.time) + route.minutes > clockMinutes('10:30 PM')) return { lastEvent: 'It is getting late to head farther out. Go home, or try this trip tomorrow.' };
-    const next = { ...state, currentLocation: place.name, money: state.money - route.fare, energy: clamp(state.energy - route.energy), time: addClockMinutes(state.time, route.minutes) };
+    const arrivalTime = addClockMinutes(state.time, route.minutes);
+    const eventNight = state.eventNight
+      ? destination === 'venue' && state.eventNight.stage === 'shared'
+        ? { ...state.eventNight, stage: 'arrived' as const, ride: { mode, fare: route.fare, minutes: route.minutes, from: state.currentLocation, arrivalTime } }
+        : destination !== 'venue' && state.eventNight.stage === 'arrived'
+          ? { ...state.eventNight, stage: 'shared' as const, ride: undefined }
+          : state.eventNight
+      : null;
+    const next = { ...state, eventNight, currentLocation: place.name, money: state.money - route.fare, energy: clamp(state.energy - route.energy), time: arrivalTime };
     const fareCopy = route.fare ? ` · −$${route.fare}` : '';
     const energyCopy = route.energy ? ` · −${route.energy} energy` : '';
     const detail = `${route.mode} from ${state.currentLocation} to ${place.name} · ${route.minutes} minutes${fareCopy}${energyCopy}.`;
     return { ...next, ...recordEvent(next, `Across Lagos · ${place.name}`, detail, `You reached ${place.name} in ${route.minutes} minutes.`), ledger: route.fare ? ledgerEntry(state, `${route.mode} · ${place.name}`, -route.fare, 'cash', state.money - route.fare) : state.ledger };
+  }),
+  shareEventPlan: ({ people, mood, budget }) => set((state) => {
+    const event = state.opportunities.find((offer) => offer.id === 'festival');
+    if (!event) return { lastEvent: 'The Lagos Music Festival offer is no longer open.' };
+    if (!['low-key', 'social', 'high-energy'].includes(mood)) return { lastEvent: 'Choose a mood for the night first.' };
+    if (!Number.isFinite(budget) || budget < 0 || budget > 100000) return { lastEvent: 'Set a spending cap between $0 and $100,000 of game cash.' };
+    const knownPeople = new Set(state.relationships.map((person) => person.name));
+    const invitees = [...new Set(people.filter((name) => knownPeople.has(name)))].slice(0, 5);
+    const arrived = state.eventNight?.stage === 'arrived' || state.currentCity === 'Lagos' && state.currentLocation === event.location;
+    const eventNight: EventNightPlan = {
+      eventId: 'festival', stage: arrived ? 'arrived' : 'shared', people: invitees, mood, budget: Math.floor(budget),
+      day: state.eventNight?.day ?? state.day, sharedAt: state.time, ...(state.eventNight?.ride ? { ride: state.eventNight.ride } : {}),
+    };
+    const who = invitees.length ? invitees.join(', ') : 'a solo night';
+    const detail = `A ${mood.replace('-', ' ')} festival plan with ${who} · $${eventNight.budget.toLocaleString()} game-cash cap. Saved in this story; no real messages were sent.`;
+    const next = { ...state, eventNight };
+    return { ...next, ...recordEvent(next, `Plan saved · ${event.title}`, detail, `Your festival plan is saved with ${who}.`) };
+  }),
+  saveEventMemory: (note) => set((state) => {
+    const pass = (state.eventNight?.ticketId && state.passes.find((item) => item.id === state.eventNight?.ticketId)) ?? state.passes.find((item) => item.eventId === 'festival');
+    if (!pass) return { lastEvent: 'Finish the festival set before saving its memory.' };
+    if (state.memories.some((memory) => memory.passId === pass.id)) return { lastEvent: 'That night already has a saved memory.' };
+    const copy = note.trim().slice(0, 500);
+    if (!copy) return { lastEvent: 'Add one detail you want to remember.' };
+    const memory: MemoryRecord = {
+      id: `memory-${pass.id}`, passId: pass.id, eventId: 'festival', title: pass.eventTitle,
+      location: pass.venue, day: pass.day, time: pass.time, people: state.eventNight?.people ?? [],
+      ...(state.eventNight ? { mood: state.eventNight.mood } : {}), note: copy,
+    };
+    const eventNight = state.eventNight ? { ...state.eventNight, stage: 'recorded' as const, memoryId: memory.id } : null;
+    const next = { ...state, eventNight, memories: [memory, ...state.memories].slice(0, 100) };
+    const detail = `You kept a memory from ${pass.eventTitle} at ${pass.venue}. It is saved with this game story.`;
+    return { ...next, ...recordEvent(next, `Memory saved · ${pass.eventTitle}`, detail) };
   }),
   createIdea: (draft) => set((state) => {
     const title = draft.title.trim();
@@ -335,12 +397,22 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     const blocked = opportunityBlockReason(offer, state);
     if (blocked) return { lastEvent: blocked };
     const changes = applyOpportunityEffects(state, offer);
+    const pass: EventPass | null = offer.id === 'festival' ? {
+      id: `pass-festival-${state.day}-${Date.now()}`, eventId: 'festival', eventTitle: offer.title, passType: 'Artist pass',
+      venue: offer.location ?? 'Freedom Park Stage', day: state.day, time: state.time, entryCost: offer.cost,
+      ...(state.eventNight?.ride ? { rideMode: state.eventNight.ride.mode } : {}), simulationOnly: true,
+    } : null;
+    const eventNight = pass && state.eventNight?.eventId === 'festival'
+      ? { ...state.eventNight, stage: 'attended' as const, ticketId: pass.id }
+      : state.eventNight;
     const next = {
       ...state,
       ...changes,
       fans: state.fans + offer.effects.fans,
       monthlyListeners: state.monthlyListeners + Math.round(offer.effects.fans * 0.4),
       opportunities: state.opportunities.filter((item) => item.id !== id),
+      eventNight,
+      passes: pass ? [pass, ...state.passes].slice(0, 20) : state.passes,
       chapterStage: offer.id === 'festival' ? 'The crowd has heard you; carry that momentum into the next release' : state.chapterStage,
     };
     const parts = [
@@ -407,11 +479,11 @@ export const useGame = create<GameState>()(persist((set, get) => ({
   reset: () => set({ ...initialState }),
 }), {
   name: 'treblr-world-save-v1',
-  version: 2,
+  version: 3,
   storage: createJSONStorage(() => localStorage),
   migrate: (persisted, _version) => migrateSaveData(persisted, initialForMigration, opportunityCatalog) as unknown as GameState,
   partialize: (state) => {
-    const { sleep: _sleep, advanceDay: _advanceDay, eat: _eat, travel: _travel, travelLocally: _travelLocally, buyBoutiqueItem: _buyBoutiqueItem, createIdea: _createIdea, recordSong: _recordSong, finishSong: _finishSong, scheduleSong: _scheduleSong, archiveSong: _archiveSong, publishPost: _publishPost, acceptOpportunity: _acceptOpportunity, messagePerson: _messagePerson, dismissEvent: _dismissEvent, spend: _spend, transferMoney: _transferMoney, reset: _reset, ...data } = state;
+    const { sleep: _sleep, advanceDay: _advanceDay, eat: _eat, travel: _travel, travelLocally: _travelLocally, shareEventPlan: _shareEventPlan, saveEventMemory: _saveEventMemory, buyBoutiqueItem: _buyBoutiqueItem, createIdea: _createIdea, recordSong: _recordSong, finishSong: _finishSong, scheduleSong: _scheduleSong, archiveSong: _archiveSong, publishPost: _publishPost, acceptOpportunity: _acceptOpportunity, messagePerson: _messagePerson, dismissEvent: _dismissEvent, spend: _spend, transferMoney: _transferMoney, reset: _reset, ...data } = state;
     return data as GameState;
   },
 }));

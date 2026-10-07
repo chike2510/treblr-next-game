@@ -227,6 +227,25 @@ export function migrateSaveData<T extends Record<string, unknown>>(
     const status = validStatuses.includes(song.status as SongStatus) ? song.status as SongStatus : "IDEA";
     return [{ ...song, id: String(song.id ?? `song-${Date.now()}`), title: String(song.title ?? "Untitled idea"), status }];
   }) : defaults.songs;
+  const nightStages = ["shared", "arrived", "attended", "recorded"];
+  const nightMoods = ["low-key", "social", "high-energy"];
+  const rawNight = saved.eventNight && typeof saved.eventNight === "object" && !Array.isArray(saved.eventNight)
+    ? saved.eventNight as Record<string, unknown>
+    : null;
+  const eventNight = saved.eventNight === null ? null : rawNight && nightStages.includes(String(rawNight.stage))
+    ? {
+        ...rawNight,
+        eventId: "festival",
+        stage: String(rawNight.stage),
+        people: Array.isArray(rawNight.people) ? rawNight.people.filter((person): person is string => typeof person === "string").slice(0, 5) : [],
+        mood: nightMoods.includes(String(rawNight.mood)) ? String(rawNight.mood) : "social",
+        budget: Math.max(0, numeric(rawNight.budget, 900)),
+        day: Math.max(1, Math.floor(numeric(rawNight.day, Number(saved.day ?? defaults.day ?? 1)))),
+        sharedAt: typeof rawNight.sharedAt === "string" ? rawNight.sharedAt : String(saved.time ?? defaults.time ?? ""),
+      }
+    : defaults.eventNight;
+  const passes = Array.isArray(saved.passes) ? saved.passes.filter((item) => item && typeof item === "object" && !Array.isArray(item)) : defaults.passes;
+  const memories = Array.isArray(saved.memories) ? saved.memories.filter((item) => item && typeof item === "object" && !Array.isArray(item)) : defaults.memories;
   return {
     ...defaults,
     ...saved,
@@ -241,6 +260,9 @@ export function migrateSaveData<T extends Record<string, unknown>>(
     equippedLook: typeof saved.equippedLook === "string" ? saved.equippedLook : defaults.equippedLook,
     songs,
     opportunities,
+    eventNight,
+    passes,
+    memories,
     relationships: Array.isArray(saved.relationships) ? saved.relationships : defaults.relationships,
     notifications: Array.isArray(saved.notifications) ? saved.notifications.slice(0, 8) : defaults.notifications,
     posts: Array.isArray(saved.posts) ? saved.posts : defaults.posts,
