@@ -57,7 +57,7 @@ assert.equal(rules.shouldExpireOpportunity(offer, 12), false);
 assert.equal(rules.shouldExpireOpportunity(offer, 13), true);
 
 const catalog = [offer];
-const defaults = { artist: { name: 'Candelar' }, money: 4320, bank: 28000, fans: 482000, monthlyListeners: 482000, energy: 73, day: 6, songs: [], opportunities: catalog, relationships: [], wardrobe: [], equippedLook: 'city-basics', notifications: [], posts: [], ledger: [], history: [] };
+const defaults = { artist: { name: 'Candelar' }, money: 4320, bank: 28000, fans: 482000, monthlyListeners: 482000, energy: 73, day: 6, songs: [], opportunities: catalog, relationships: [], wardrobe: [], equippedLook: 'city-basics', notifications: [], posts: [], ledger: [], history: [], eventNight: null, passes: [], memories: [] };
 const serialized = JSON.stringify({ ...defaults, money: 999, day: 9, songs: [{ ...song, status: 'DEMO' }], opportunities: [{ id: 'test-offer', reward: 'stale legacy copy' }], history: [{ title: 'Saved story' }] });
 const restored = JSON.parse(serialized);
 const migrated = rules.migrateSaveData(restored, defaults, catalog);
@@ -68,6 +68,24 @@ assert.deepEqual(migrated.wardrobe, []);
 assert.equal(migrated.equippedLook, 'city-basics');
 assert.deepEqual(migrated.opportunities, catalog, 'legacy opportunity display text is replaced with canonical reward data');
 assert.equal(migrated.history[0].title, 'Saved story');
+assert.equal(migrated.eventNight, null, 'older saves receive a clean empty event-night state');
+assert.deepEqual(migrated.passes, [], 'older saves receive an empty local pass wallet');
+assert.deepEqual(migrated.memories, [], 'older saves receive an empty memory archive');
 assert.equal(rules.migrateSaveData(null, defaults, catalog), defaults);
+
+const savedNight = {
+  ...defaults,
+  eventNight: { eventId: 'festival', stage: 'arrived', people: ['Maya Ellis', 'Unknown'], mood: 'social', budget: 900, day: 8, sharedAt: '6:42 PM', ride: { mode: 'danfo', fare: 7, minutes: 40, from: 'The Apartment', arrivalTime: '7:22 PM' } },
+  passes: [{ id: 'pass-1', eventId: 'festival' }],
+  memories: [{ id: 'memory-1', passId: 'pass-1', eventId: 'festival', note: 'A saved moment' }],
+};
+const restoredNight = rules.migrateSaveData(savedNight, defaults, catalog);
+assert.equal(restoredNight.eventNight.stage, 'arrived');
+assert.deepEqual(restoredNight.eventNight.people, ['Maya Ellis', 'Unknown']);
+assert.equal(restoredNight.eventNight.ride.arrivalTime, '7:22 PM');
+assert.equal(restoredNight.passes[0].id, 'pass-1');
+assert.equal(restoredNight.memories[0].note, 'A saved moment');
+const invalidNight = rules.migrateSaveData({ ...savedNight, eventNight: { ...savedNight.eventNight, stage: 'teleported' } }, defaults, catalog);
+assert.equal(invalidNight.eventNight, null, 'unsupported event-night stages fall back to the safe default');
 
 console.log('Game rules: lifecycle, context-gated opportunities, local routes, shared social costs, releases, deadlines, and save/reload migration passed.');

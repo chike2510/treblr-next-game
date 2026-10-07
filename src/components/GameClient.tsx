@@ -7,13 +7,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import Phone from '@/components/Phone';
 import { LagosMapSketch } from '@/components/PhoneScreens';
+import EventNightFlow from '@/components/EventNightFlow';
 import WorldRoom, { roomSpots } from '@/components/WorldRoom';
 import { CAMPAIGN_PLANS, opportunityBlockReason, type Opportunity, type Song } from '@/lib/game-rules';
 import { useGame } from '@/lib/game';
 import { CITIES, TRAVEL_CASH, TRAVEL_ENERGY, cityByName } from '@/lib/cities';
 import { CashIcon, EnergyIcon } from '@/components/CostChips';
 
-type PanelKey = 'studio' | 'career' | 'world' | 'music' | 'team' | 'settings' | 'notifications' | 'profile' | 'shop' | 'history';
+type PanelKey = 'studio' | 'career' | 'world' | 'music' | 'team' | 'settings' | 'notifications' | 'profile' | 'shop' | 'history' | 'event-night';
 
 
 const money = (value: number) => `${value >= 0 ? '+' : '−'}$${Math.abs(value).toLocaleString()}`;
@@ -35,6 +36,7 @@ function Panel({ kind, close }: { kind: PanelKey; close: () => void }) {
     profile: { kicker: 'ARTIST PROFILE', title: game.artist.name, sub: `${game.artist.genre} · From ${game.artist.origin}, currently in ${game.currentCity}.` },
     shop: { kicker: 'THE BOUTIQUE', title: 'Boutique', sub: 'Small details change how a room meets you.' },
     history: { kicker: 'YOUR STORY SO FAR', title: 'Your story', sub: 'A persistent log of choices and game-day recaps.' },
+    'event-night': { kicker: 'ONE NIGHT, CONNECTED', title: 'Lagos Music Festival', sub: 'Plan with your people, find a route, take the stage, and keep a memory.' },
   };
   const meta = contents[kind];
   useEffect(() => {
@@ -69,6 +71,7 @@ function Panel({ kind, close }: { kind: PanelKey; close: () => void }) {
           {game.opportunities.length ? <div className="offer-stack">{game.opportunities.map((offer) => <OfferCard key={offer.id} item={offer}/>)}</div> : <div className="empty-note">No offers right now. Make a song or meet someone.</div>}
           <div className="mini-stat-grid"><div className="mini-stat"><span>REPUTATION</span><b>{game.reputation}/100</b></div><div className="mini-stat"><span>HYPE</span><b>{game.hype}%</b></div><div className="mini-stat"><span>CONTACTS</span><b>{game.relationships.length}</b></div></div>
         </>}
+        {kind === 'event-night' && <EventNightFlow/>}
         {kind === 'world' && <>
           <Postcard city={game.currentCity} location={game.currentLocation}/>
           {game.currentCity === 'Lagos' && <div className="panel-local-map"><div><b className="board-title">Walk Lagos</b><p>Yaba to Lagos Island. Tap a stop to walk there.</p></div><LagosMapSketch onWalk={(place) => game.travelLocally(place, 'walk')}/></div>}
@@ -188,8 +191,13 @@ export default function GameClient() {
   };
   const fanLabel = short(game.fans);
   const readyOffer = game.opportunities.some((offer) => !opportunityBlockReason(offer, game));
+  const openFestival = game.opportunities.some((offer) => offer.id === 'festival');
+  const unrecordedPass = game.passes.find((pass) => !game.memories.some((memory) => memory.passId === pass.id));
   const objective: { text: string; panel: PanelKey } = game.currentCity === 'Atlanta'
     ? { text: 'Seyi’s session is open tonight', panel: 'career' }
+    : unrecordedPass ? { text: 'Keep a memory from the festival', panel: 'event-night' }
+    : game.eventNight && game.eventNight.stage !== 'recorded' ? { text: 'Continue your festival night', panel: 'event-night' }
+    : openFestival ? { text: 'Plan your night at the festival', panel: 'event-night' }
     : readyOffer ? { text: 'An offer is ready to take', panel: 'career' }
     : game.songs.some((song) => song.status === 'FINISHED') ? { text: 'A master is ready to release', panel: 'music' }
     : { text: `Day ${game.day} is still yours to shape`, panel: 'career' };
@@ -242,6 +250,6 @@ export default function GameClient() {
     </nav>
     <Phone open={phoneOpen} setOpen={setPhoneOpen} onPanel={(value) => { setPhoneOpen(false); setPanel(value as PanelKey); }}/>
     <AnimatePresence>{panel && <Panel key={panel} kind={panel} close={() => setPanel(null)}/>}</AnimatePresence>
-    <AnimatePresence>{toast && <motion.div className="toast" role="status" aria-live="polite" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>{toast}</motion.div>}</AnimatePresence>
+    <AnimatePresence>{toast && <motion.div className={`toast${panel === 'event-night' ? ' toast--event-night' : ''}`} role="status" aria-live="polite" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>{toast}</motion.div>}</AnimatePresence>
   </main>;
 }
