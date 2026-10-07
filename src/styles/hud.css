@@ -1,98 +1,4 @@
-/* ==========================================================================
-   TREBLR · Direction A "Lagos After Dark"
-   Design tokens + Phase 1 HUD. Loaded after globals.css, so it wins ties.
-   Rules: one accent (danfo), opaque surfaces, no blur outside scrims,
-   3 radii, type floor 11px desktop / 12px mobile, tracking <= .06em.
-   ========================================================================== */
-
-:root {
-  /* colour */
-  --asphalt: #0E0D0C;
-  --soot: #1A1816;
-  --concrete: #2B2825;
-  --line-dark: #3D3934;
-  --bone: #EDE6D8;
-  --dust: #9A9286;
-  --danfo: #F5C400;
-  --danfo-edge: #8A6E00;
-  --signal: #E5432B;
-  --lagoon: #1E8C84;
-  --sodium: #FF9E3D;
-  --paper: #F2EDE3;
-  --ink: #151311;
-
-  /* radius */
-  --r-sm: 4px;
-  --r-md: 10px;
-  --r-pill: 999px;
-
-  /* spacing (4px scale) */
-  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
-
-  /* type */
-  --font-poster-stack: var(--font-poster), 'Anton', Impact, sans-serif;
-  --font-ui-stack: var(--font-ui), 'Archivo', system-ui, sans-serif;
-  --font-mono-stack: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
-  --display: var(--font-ui-stack);
-  --body: var(--font-ui-stack);
-  --poster: var(--font-poster-stack);
-  --mono-font: var(--font-mono-stack);
-  --fs-min: 11px;
-  --fs-sm: 12px;
-  --fs-md: 14px;
-  --fs-lg: 18px;
-  --fs-xl: 22px;
-
-  /* motion */
-  --ease: cubic-bezier(.2, .8, .2, 1);
-  --t-press: 120ms;
-  --t-sheet: 200ms;
-
-  /* HUD-safe zone */
-  --hud-top: 96px;
-  --hud-bottom: 180px;
-}
-
-@media (max-width: 700px) {
-  :root { --fs-min: 12px; }
-}
-
-body { font-family: var(--body); }
-.mono { font-family: var(--mono-font); font-variant-numeric: tabular-nums; letter-spacing: 0; }
-.eyebrow { letter-spacing: .04em; }
-
-/* --------------------------------------------------------------------------
-   Buttons
-   -------------------------------------------------------------------------- */
-.btn-primary,
-.pill-button.orange,
-.stage-day-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s-2);
-  min-height: 44px;
-  padding: 0 var(--s-4);
-  border: 0;
-  border-radius: var(--r-sm);
-  background: var(--danfo);
-  color: var(--ink);
-  font: 600 var(--fs-md)/1 var(--body);
-  letter-spacing: 0;
-  text-transform: none;
-  box-shadow: 0 2px 0 var(--danfo-edge);
-  transition: transform var(--t-press) var(--ease), box-shadow var(--t-press) var(--ease), background var(--t-press) var(--ease);
-}
-.btn-primary:hover, .pill-button.orange:hover { background: #FFD21F; }
-.btn-primary:active, .pill-button.orange:active { transform: translateY(1px); box-shadow: none; }
-
-.pill-button {
-  border-radius: var(--r-sm);
-  font: 600 var(--fs-sm)/1.1 var(--body);
-  letter-spacing: 0;
-  min-height: 36px;
-}
-.pill-button:not(.orange) { background: var(--ink); color: var(--paper); }
+/* Play screen: room, hotspots, HUD, bottom nav, toast. */
 
 /* --------------------------------------------------------------------------
    World + hotspots (one coordinate set lives in WorldRoom.tsx)
@@ -294,26 +200,6 @@ body { font-family: var(--body); }
 .toast { border: 1px solid var(--line-dark); border-radius: var(--r-md); background: var(--soot); color: var(--bone); font-size: var(--fs-sm); backdrop-filter: none; }
 
 /* --------------------------------------------------------------------------
-   Panels: light paper sheet, title + close, radius 10, no blur
-   -------------------------------------------------------------------------- */
-.modal-backdrop { background: rgba(14, 13, 12, .7); }
-.game-panel { border-radius: var(--r-md); background: var(--paper); color: var(--ink); border: 1px solid rgba(21, 19, 17, .2); }
-.panel-head { background: var(--paper); backdrop-filter: none; }
-.panel-head h2 { font: 600 var(--fs-xl)/1.15 var(--body); letter-spacing: -.01em; margin: 0; }
-.panel-sub { font-size: var(--fs-md); color: #5c554c; }
-.close-button { border-radius: var(--r-sm); background: transparent; border: 1px solid rgba(21, 19, 17, .2); color: var(--ink); }
-.close-button:hover { background: rgba(21, 19, 17, .06); }
-
-/* --------------------------------------------------------------------------
-   Phone: opaque widgets, game-time status bar
-   -------------------------------------------------------------------------- */
-.phone-frame { border-color: var(--concrete); background: var(--asphalt); }
-.phone-top { display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-sm); color: var(--bone); }
-.phone-top-city { color: var(--dust); }
-.phone-widget { background: var(--soot); border: 1px solid var(--line-dark); border-radius: var(--r-md); backdrop-filter: none; }
-.app-icon { border-radius: var(--r-md); box-shadow: none; }
-
-/* --------------------------------------------------------------------------
    Responsive
    -------------------------------------------------------------------------- */
 /* Hotspots only where the plate isn't heavily cropped; elsewhere the "Here" tray. */
@@ -357,3 +243,4 @@ body { font-family: var(--body); }
 @media (prefers-reduced-motion: reduce) {
   .hud-goal-dot { animation: none; }
 }
+

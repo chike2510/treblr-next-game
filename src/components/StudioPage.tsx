@@ -103,7 +103,7 @@ export default function StudioPage() {
       <div className="studio-narrative-card"><div className="eyebrow">THIS WEEK IN LAGOS</div><h2>{game.chapterStage}.</h2><p>Teo’s invitation is still on the table. Make the record at your pace; the city will answer when you let it out.</p><Link href="/" className="back-link">RETURN TO THE APARTMENT <ArrowRight size={13}/></Link></div>
       <div className="studio-ledger-card"><div className="studio-panel-head"><div><div className="eyebrow">CASH FLOW</div><h3>Recent music costs & income</h3></div><Banknote size={18}/></div>{game.ledger.slice(0, 4).map((entry) => <div className="studio-ledger-row" key={entry.id}><span><b>{entry.description}</b><small>Day {entry.day} · {entry.bucket}</small></span><strong className={entry.amount >= 0 ? 'positive' : 'negative'}>{entry.amount >= 0 ? '+' : '−'}{cash(Math.abs(entry.amount))}</strong></div>)}</div>
     </section>
-    <footer className="studio-footer"><span>All listeners, plays and platforms are simulated inside TREBLR.</span><span>Progress saves in this browser.</span></footer>
+    
     {message && <div className="toast studio-toast" role="status">{message}</div>}
   </main>;
 }

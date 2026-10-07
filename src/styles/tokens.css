@@ -1,0 +1,63 @@
+/* ==========================================================================
+   TREBLR · Direction A "Lagos After Dark"
+   Design tokens + Phase 1 HUD. Loaded after globals.css, so it wins ties.
+   Rules: one accent (danfo), opaque surfaces, no blur outside scrims,
+   3 radii, type floor 11px desktop / 12px mobile, tracking <= .06em.
+   ========================================================================== */
+
+:root {
+  /* colour */
+  --asphalt: #0E0D0C;
+  --soot: #1A1816;
+  --concrete: #2B2825;
+  --line-dark: #3D3934;
+  --bone: #EDE6D8;
+  --dust: #9A9286;
+  --danfo: #F5C400;
+  --danfo-edge: #8A6E00;
+  --signal: #E5432B;
+  --lagoon: #1E8C84;
+  --sodium: #FF9E3D;
+  --paper: #F2EDE3;
+  --ink: #151311;
+
+  /* radius */
+  --r-sm: 4px;
+  --r-md: 10px;
+  --r-pill: 999px;
+
+  /* spacing (4px scale) */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
+
+  /* type */
+  --font-poster-stack: var(--font-poster), 'Anton', Impact, sans-serif;
+  --font-ui-stack: var(--font-ui), 'Archivo', system-ui, sans-serif;
+  --font-mono-stack: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
+  --display: var(--font-ui-stack);
+  --body: var(--font-ui-stack);
+  --poster: var(--font-poster-stack);
+  --mono-font: var(--font-mono-stack);
+  --fs-min: 11px;
+  --fs-sm: 12px;
+  --fs-md: 14px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+
+  /* motion */
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --t-press: 120ms;
+  --t-sheet: 200ms;
+
+  /* HUD-safe zone */
+  --hud-top: 96px;
+  --hud-bottom: 180px;
+}
+
+@media (max-width: 700px) {
+  :root { --fs-min: 12px; }
+}
+
+body { font-family: var(--body); }
+.mono { font-family: var(--mono-font); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.eyebrow { letter-spacing: .04em; }
+

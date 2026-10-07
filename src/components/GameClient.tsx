@@ -10,23 +10,11 @@ import { LagosMapSketch } from '@/components/PhoneScreens';
 import WorldRoom, { roomSpots } from '@/components/WorldRoom';
 import { CAMPAIGN_PLANS, opportunityBlockReason, type Opportunity, type Song } from '@/lib/game-rules';
 import { useGame } from '@/lib/game';
+import { CITIES, TRAVEL_CASH, TRAVEL_ENERGY, cityByName } from '@/lib/cities';
+import { CashIcon, EnergyIcon } from '@/components/CostChips';
 
 type PanelKey = 'studio' | 'career' | 'world' | 'music' | 'team' | 'settings' | 'notifications' | 'profile' | 'shop' | 'history';
 
-const cities = [
-  { name: 'Lagos', tag: 'Your roots · Afrofusion', accent: 'COAST · WEST AFRICA' },
-  { name: 'London', tag: 'New voices · UK garage', accent: 'CITY · UNITED KINGDOM' },
-  { name: 'New York', tag: 'Late nights · everywhere', accent: 'CITY · UNITED STATES' },
-  { name: 'Los Angeles', tag: 'Sessions · sun all year', accent: 'CITY · UNITED STATES' },
-  { name: 'Atlanta', tag: '808s · Seyi’s late session', accent: 'CITY · UNITED STATES' },
-  { name: 'Toronto', tag: 'After hours · R&B', accent: 'CITY · CANADA' },
-  { name: 'Accra', tag: 'Highlife · new energy', accent: 'COAST · GHANA' },
-  { name: 'Johannesburg', tag: 'Amapiano · open doors', accent: 'CITY · SOUTH AFRICA' },
-  { name: 'Paris', tag: 'New scenes · art after dark', accent: 'CITY · FRANCE' },
-  { name: 'Tokyo', tag: 'Neon nights · new perspective', accent: 'CITY · JAPAN' },
-  { name: 'Seoul', tag: 'Bright stages · sharp sounds', accent: 'CITY · SOUTH KOREA' },
-  { name: 'Dubai', tag: 'Big rooms · wide horizons', accent: 'CITY · UAE' },
-];
 
 const money = (value: number) => `${value >= 0 ? '+' : '−'}$${Math.abs(value).toLocaleString()}`;
 const cash = (value: number) => `$${Math.round(value).toLocaleString()}`;
@@ -37,16 +25,16 @@ function Panel({ kind, close }: { kind: PanelKey; close: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const contents: Record<PanelKey, { kicker: string; title: string; sub: string }> = {
-    studio: { kicker: 'THE RED-LIGHT ROOM', title: 'Make something honest.', sub: 'Build a song in stages—from the first feeling to a finished release plan.' },
-    career: { kicker: 'PEOPLE ARE CALLING', title: 'The next move is yours.', sub: 'Every offer has one set of requirements, costs and rewards. Check the city and deadline before you say yes.' },
-    world: { kicker: 'CITIES WITH A PULSE', title: 'Where to next?', sub: 'Lagos is home. Atlanta is the first contrasting scene—with a local session that only exists there.' },
-    music: { kicker: 'YOUR CATALOGUE', title: 'Songs carry the story.', sub: 'Ideas become demos, masters, scheduled releases, and then a living catalog.' },
-    team: { kicker: 'YOUR PEOPLE', title: 'Good things travel together.', sub: 'Reply, commit to a session, offer help, or politely protect your time.' },
-    settings: { kicker: 'PLAYER OPTIONS', title: 'Make it yours.', sub: 'Your story lives in this browser.' },
-    notifications: { kicker: 'WHILE YOU WERE OUT', title: 'A little movement.', sub: 'These are recent notifications. Important choices are saved in the activity history.' },
+    studio: { kicker: 'THE RED-LIGHT ROOM', title: 'Studio', sub: 'Build a song in stages—from the first feeling to a finished release plan.' },
+    career: { kicker: 'PEOPLE ARE CALLING', title: 'Offers', sub: 'Every offer has one set of requirements, costs and rewards. Check the city and deadline before you say yes.' },
+    world: { kicker: 'CITIES WITH A PULSE', title: 'Departures', sub: 'Lagos is home. Atlanta is the first contrasting scene—with a local session that only exists there.' },
+    music: { kicker: 'YOUR CATALOGUE', title: 'Your music', sub: 'Ideas become demos, masters, scheduled releases, and then a living catalog.' },
+    team: { kicker: 'YOUR PEOPLE', title: 'Your people', sub: 'Reply, commit to a session, offer help, or politely protect your time.' },
+    settings: { kicker: 'PLAYER OPTIONS', title: 'Settings', sub: '' },
+    notifications: { kicker: 'WHILE YOU WERE OUT', title: 'Notifications', sub: 'These are recent notifications. Important choices are saved in the activity history.' },
     profile: { kicker: 'ARTIST PROFILE', title: game.artist.name, sub: `${game.artist.genre} · From ${game.artist.origin}, currently in ${game.currentCity}.` },
-    shop: { kicker: 'THE BOUTIQUE', title: 'Wear the next era.', sub: 'Small details change how a room meets you.' },
-    history: { kicker: 'YOUR STORY SO FAR', title: 'The moments that moved you.', sub: 'A persistent log of choices and game-day recaps.' },
+    shop: { kicker: 'THE BOUTIQUE', title: 'Boutique', sub: 'Small details change how a room meets you.' },
+    history: { kicker: 'YOUR STORY SO FAR', title: 'Your story', sub: 'A persistent log of choices and game-day recaps.' },
   };
   const meta = contents[kind];
   useEffect(() => {
@@ -69,54 +57,92 @@ function Panel({ kind, close }: { kind: PanelKey; close: () => void }) {
   }, [close]);
 
   return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <motion.section ref={dialogRef} className="game-panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" aria-describedby="panel-description" initial={{ opacity: 0, y: 20, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 15, scale: .99 }} transition={{ duration: .2 }}>
-      <div className="panel-head"><div><h2 id="panel-title">{meta.title}</h2><p id="panel-description" className="panel-sub">{meta.sub}</p></div><button ref={closeRef} className="close-button" onClick={close} aria-label="Close dialog"><X size={17}/></button></div>
+    <motion.section ref={dialogRef} className="game-panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" initial={{ opacity: 0, y: 20, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 15, scale: .99 }} transition={{ duration: .2 }}>
+      <div className="panel-head"><div><h2 id="panel-title">{meta.title}</h2></div><button ref={closeRef} className="close-button" onClick={close} aria-label="Close dialog"><X size={17}/></button></div>
       <div className="panel-content">
         {kind === 'studio' && <>
-          <div className="object-stage"><div className="stage-quote">“The hook arrives before the words do.”</div></div>
           <div className="studio-quick-facts"><div><span>CASH</span><b>${game.money.toLocaleString()}</b></div><div><span>ENERGY</span><b>{game.energy}%</b></div><div><span>IDEAS IN PROGRESS</span><b>{game.songs.filter((song) => song.status !== 'RELEASED' && song.status !== 'ARCHIVED').length}</b></div></div>
-          <p className="panel-copy">Make ideas, demos, finished masters, and release plans in one focused workspace. Every cost is shown before you commit.</p>
-          <Link className="pill-button orange studio-open-link" href="/studio" onClick={close}>OPEN THE DETAILED MUSIC STUDIO <ArrowUpRight size={14}/></Link>
+          <Link className="btn-primary studio-open-link" href="/studio" onClick={close}>Open studio <ArrowUpRight size={15}/></Link>
           <div className="panel-song-list">{game.songs.filter((song) => song.status !== 'ARCHIVED').slice(0, 3).map((song) => <SongSummary key={song.id} song={song}/>)}</div>
         </>}
         {kind === 'career' && <>
-          <div className="object-stage"><div className="stage-quote">One good room can change the shape of a year.</div></div>
-          {game.opportunities.length ? game.opportunities.map((offer) => <OpportunityRow key={offer.id} item={offer}/>) : <div className="quote-note">Your calendar is clear for a moment. Make a song, meet someone, or let the city surprise you.</div>}
-          <div className="mini-stat-grid"><div className="mini-stat"><span>REPUTATION</span><b>{game.reputation}/100</b></div><div className="mini-stat"><span>HYPE</span><b>{game.hype}%</b></div><div className="mini-stat"><span>OPEN CONVERSATIONS</span><b>{game.relationships.length}</b></div></div>
+          {game.opportunities.length ? <div className="offer-stack">{game.opportunities.map((offer) => <OfferCard key={offer.id} item={offer}/>)}</div> : <div className="empty-note">No offers right now. Make a song or meet someone.</div>}
+          <div className="mini-stat-grid"><div className="mini-stat"><span>REPUTATION</span><b>{game.reputation}/100</b></div><div className="mini-stat"><span>HYPE</span><b>{game.hype}%</b></div><div className="mini-stat"><span>CONTACTS</span><b>{game.relationships.length}</b></div></div>
         </>}
         {kind === 'world' && <>
-          {game.currentCity === 'Lagos' ? <div className="panel-local-map"><div><div className="eyebrow">YABA → LAGOS ISLAND · READY NOW</div><p>Tap a stop to walk there. This map is drawn in the app and updates your saved location, time, and energy.</p></div><LagosMapSketch onWalk={(place) => game.travelLocally(place, 'walk')}/></div> : <div className="quote-note panel-nonlagos-map"><div className="eyebrow">YOUR LAGOS NEIGHBORHOOD</div><p>The local map is waiting back in Lagos. Your {game.currentCity} room stays saved while you travel.</p><button className="pill-button orange" onClick={() => game.travel('Lagos')}>RETURN TO LAGOS · $420 + 15 ENERGY</button></div>}
-          <div className="quote-note city-distinction-note"><b>{game.currentCity === 'Atlanta' ? 'ATLANTA · THE LOCAL SCENE' : 'LAGOS · YOUR HOME SCENE'}</b><p>{game.currentCity === 'Atlanta' ? 'Seyi Vibe’s late session is here. The collaboration opportunity is only valid in Atlanta; the city changes what you can do, not just the label on the map.' : 'The Lagos Music Festival and Teo Park’s finishing room are local. Travel costs $420 cash and 15 energy; your save and relationships travel with you.'}</p></div>
-          <div className="city-grid">{cities.map((city) => <article className="city-card" key={city.name}><div><div className="eyebrow" style={{ color: '#f6c28d' }}>{city.accent}</div><h3>{city.name}</h3><p>{city.tag}</p></div><button disabled={city.name === game.currentCity || game.money < 420 || game.energy < 15} onClick={() => game.travel(city.name)}>{city.name === game.currentCity ? 'YOU ARE HERE' : 'TRAVEL · $420 + 15 ENERGY'}</button></article>)}</div>
+          <Postcard city={game.currentCity} location={game.currentLocation}/>
+          {game.currentCity === 'Lagos' && <div className="panel-local-map"><div><b className="board-title">Walk Lagos</b><p>Yaba to Lagos Island. Tap a stop to walk there.</p></div><LagosMapSketch onWalk={(place) => game.travelLocally(place, 'walk')}/></div>}
+          <div className="board" role="table" aria-label={`Departures from ${game.currentCity}`}>
+            <div className="board-head" role="row"><span role="columnheader">Dest</span><span role="columnheader">City</span><span role="columnheader" className="board-scene-h">Scene</span><span role="columnheader">Fare</span><span role="columnheader"><span className="sr-only">Action</span></span></div>
+            {CITIES.filter((city) => city.name !== game.currentCity).map((city) => { const cantAfford = game.money < TRAVEL_CASH || game.energy < TRAVEL_ENERGY; return <div className="board-row" role="row" key={city.name}>
+              <span role="cell" className="board-code mono">{city.code}</span>
+              <span role="cell" className="board-city">{city.name}</span>
+              <span role="cell" className="board-scene">{city.scene}</span>
+              <span role="cell" className="board-fare"><CostChips cash={TRAVEL_CASH} energy={TRAVEL_ENERGY}/></span>
+              <span role="cell"><button type="button" className="btn-board" disabled={cantAfford} title={cantAfford ? 'Not enough cash or energy' : `Fly to ${city.name}`} onClick={() => game.travel(city.name)}>{cantAfford ? 'Short' : 'Fly'}</button></span>
+            </div>; })}
+          </div>
         </>}
         {kind === 'music' && <>
-          <div className="map-strip"><div className="map-pin p1"/><div className="map-pin p2"/><div className="map-pin p3"/><div className="map-label">{game.monthlyListeners.toLocaleString()} MONTHLY LISTENERS</div></div>
-          <div className="mini-stat-grid"><div className="mini-stat"><span>MONTHLY LISTENERS</span><b>{short(game.monthlyListeners)}</b></div><div className="mini-stat"><span>AUDIENCE</span><b>{short(game.fans)}</b></div><div className="mini-stat"><span>PROJECTED ROYALTIES</span><b>{cash(projectedRoyalties(game.songs, game.fans, game.hype))}/DAY</b></div></div>
-          <div className="panel-song-list">{game.songs.map((song) => <SongSummary key={song.id} song={song}/>)}</div>
-          <Link className="pill-button orange studio-open-link" href="/studio" onClick={close}>OPEN MUSIC CREATION & RELEASE PLANNER <ArrowUpRight size={14}/></Link>
-          <p className="panel-footnote">Royalties shown above are a modelled daily estimate, not cash already earned. End the in-game day to settle actual streams to your ledger.</p>
+          <div className="mini-stat-grid"><div className="mini-stat"><span>LISTENERS / MO</span><b>{short(game.monthlyListeners)}</b></div><div className="mini-stat"><span>FANS</span><b>{short(game.fans)}</b></div><div className="mini-stat"><span>EST. ROYALTIES</span><b>{cash(projectedRoyalties(game.songs, game.fans, game.hype))}/day</b></div></div>
+          <ol className="tracklist">{game.songs.map((song, index) => <TrackRow key={song.id} song={song} index={index + 1}/>)}</ol>
+          <Link className="btn-primary studio-open-link" href="/studio" onClick={close}>Open studio <ArrowUpRight size={15}/></Link>
         </>}
-        {kind === 'team' && <>{game.relationships.map((person) => <div className="person-row person-row-choices" key={person.name}><div className="avatar-bubble">{person.avatar}</div><div className="song-main"><b>{person.name}</b><span>{person.role} · Trust {person.trust}</span><div className="meter-line" style={{ marginTop: 8 }}><i style={{ width: `${person.trust}%` }}/></div><div className="person-note">{person.note}</div><div className="person-actions"><button className="pill-button small" onClick={() => game.messagePerson(person.name, 'reply')}>REPLY · FREE</button><button className="pill-button ghost small" disabled={person.name === 'Teo Park' && game.currentCity !== 'Lagos' || game.money < 210 || game.energy < 12} onClick={() => game.messagePerson(person.name, 'accept-session')}>SESSION · $210</button><button className="pill-button ghost small" disabled={game.energy < 8} onClick={() => game.messagePerson(person.name, 'help')}>HELP · 8 ENERGY</button><button className="text-button" onClick={() => game.messagePerson(person.name, 'decline')}>PASS POLITELY</button></div></div></div>)}</>}
-        {kind === 'notifications' && <>{game.notifications.map((note, index) => <div className="opportunity" key={`${note}-${index}`}><div className="opp-sigil"><Bell size={16}/></div><div className="opp-copy"><div className="opp-title">{note}</div><div className="opp-detail">Recent notification · {index === 0 ? 'just now' : `${index + 1} in your history`}</div></div><ChevronRight size={16} color="#988b83"/></div>)}<button className="pill-button ghost" onClick={() => { close(); window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-treblr-history')), 30); }}>OPEN PERSISTENT ACTIVITY HISTORY</button></>}
-        {kind === 'history' && <>{game.history.length ? game.history.map((entry) => <article className="history-entry" key={entry.id}><div className="history-marker"><Activity size={13}/></div><div><div className="history-entry-meta">DAY {entry.day} · {entry.time}</div><b>{entry.title}</b><p>{entry.detail}</p></div></article>) : <div className="quote-note">Your next choice will start the activity history.</div>}<div className="history-empty-note">The activity log is saved with your local game progress.</div></>}
-        {kind === 'profile' && <><div className="object-stage"><div className="stage-quote">Your sound. Your pace. Your next city.</div></div><div className="mini-stat-grid"><div className="mini-stat"><span>AUDIENCE</span><b>{short(game.fans)}</b></div><div className="mini-stat"><span>MONTHLY LISTENERS</span><b>{short(game.monthlyListeners)}</b></div><div className="mini-stat"><span>REPUTATION</span><b>{game.reputation}</b></div></div><div className="quote-note">{game.artist.name} is a {game.artist.genre.toLowerCase()} artist. Born in {game.artist.origin}; currently in {game.currentCity}.</div></>}
-        {kind === 'shop' && <>{['Studio headphones', 'Tour-ready jacket', 'Worn-in stage boots'].map((item, index) => { const price = [320, 550, 240][index]; return <div className="person-row" key={item}><div className="song-art"><Star size={18}/></div><div className="song-main"><b>{item}</b><span>Looks good on the way to somewhere.</span></div><button className="pill-button small" disabled={game.money < price} onClick={() => game.spend(price, `Boutique · ${item}`)}>${price}</button></div>; })}</>}
-        {kind === 'settings' && <><div className="quote-note">Your progress is saved on this device. This story starts in Lagos with Candelar and the first-week chapter.</div><div className="person-row"><div className="opp-sigil"><Sparkles size={18}/></div><div className="song-main"><b>Start a new story</b><span>Reset the local game save to the original Candelar scenario.</span></div><button className="pill-button small" onClick={() => { if (window.confirm('Start a new story? This will clear the saved progress in this browser.')) { game.reset(); close(); } }}>RESET</button></div><div className="quote-note">TREBLR is a fictional simulation. Social accounts, streams and listeners are in-game and are not connected to real services.</div></>}
+        {kind === 'team' && <>{game.relationships.map((person) => <div className="person-row person-row-choices" key={person.name}><div className="avatar-bubble">{person.avatar}</div><div className="song-main"><b>{person.name}</b><span>{person.role} · Trust {person.trust}</span><div className="meter-line" style={{ marginTop: 8 }}><i style={{ width: `${person.trust}%` }}/></div><div className="person-note">{person.note}</div><div className="person-actions"><button className="pill-button small" onClick={() => game.messagePerson(person.name, 'reply')}>Reply</button><button className="pill-button ghost small" disabled={person.name === 'Teo Park' && game.currentCity !== 'Lagos' || game.money < 210 || game.energy < 12} onClick={() => game.messagePerson(person.name, 'accept-session')}>Session · $210</button><button className="pill-button ghost small" disabled={game.energy < 8} onClick={() => game.messagePerson(person.name, 'help')}>Help · 8 energy</button><button className="text-button" onClick={() => game.messagePerson(person.name, 'decline')}>Pass</button></div></div></div>)}</>}
+        {kind === 'notifications' && <>{game.notifications.map((note, index) => <div className="opportunity" key={`${note}-${index}`}><div className="opp-sigil"><Bell size={16}/></div><div className="opp-copy"><div className="opp-title">{note}</div><div className="opp-detail">Recent notification · {index === 0 ? 'just now' : `${index + 1} in your history`}</div></div><ChevronRight size={16} color="#988b83"/></div>)}<button className="pill-button ghost" onClick={() => { close(); window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-treblr-history')), 30); }}>Open your story</button></>}
+        {kind === 'history' && <>{game.history.length ? game.history.map((entry) => <article className="history-entry" key={entry.id}><div className="history-marker"><Activity size={13}/></div><div><div className="history-entry-meta">DAY {entry.day} · {entry.time}</div><b>{entry.title}</b><p>{entry.detail}</p></div></article>) : <div className="quote-note">Your next choice will start the activity history.</div>}</>}
+        {kind === 'profile' && <><div className="mini-stat-grid"><div className="mini-stat"><span>AUDIENCE</span><b>{short(game.fans)}</b></div><div className="mini-stat"><span>MONTHLY LISTENERS</span><b>{short(game.monthlyListeners)}</b></div><div className="mini-stat"><span>REPUTATION</span><b>{game.reputation}</b></div></div><div className="quote-note">{game.artist.name} is a {game.artist.genre.toLowerCase()} artist. Born in {game.artist.origin}; currently in {game.currentCity}.</div></>}
+        {kind === 'shop' && <>{['Studio headphones', 'Tour-ready jacket', 'Worn-in stage boots'].map((item, index) => { const price = [320, 550, 240][index]; return <div className="person-row" key={item}><div className="song-art"><Star size={18}/></div><div className="song-main"><b>{item}</b><span>{['Closed-back, studio grade', 'Heavy denim, tour ready', 'Worn-in leather'][index]}</span></div><button className="pill-button small" disabled={game.money < price} onClick={() => game.spend(price, `Boutique · ${item}`)}>${price}</button></div>; })}</>}
+        {kind === 'settings' && <><div className="person-row"><div className="opp-sigil"><Sparkles size={18}/></div><div className="song-main"><b>Start a new story</b><span>Back to day 1 in Lagos with Candelar.</span></div><button className="pill-button small" onClick={() => { if (window.confirm('Start a new story? This will clear the saved progress in this browser.')) { game.reset(); close(); } }}>Reset</button></div><div className="empty-note">TREBLR is fiction. Your save lives on this device, and no social account, stream or listener here is real.</div></>}
       </div>
     </motion.section>
   </div>;
 }
 
-function OpportunityRow({ item }: { item: Opportunity }) {
+function OfferCard({ item }: { item: Opportunity }) {
   const game = useGame();
   const blocked = opportunityBlockReason(item, game);
-  const rewards = [
-    item.effects.cash ? `${money(item.effects.cash)} cash` : '',
-    item.effects.fans ? `+${item.effects.fans.toLocaleString()} fans` : '',
-    item.effects.hype ? `${item.effects.hype > 0 ? '+' : ''}${item.effects.hype} hype` : '',
-    item.effects.reputation ? `${item.effects.reputation > 0 ? '+' : ''}${item.effects.reputation} rep` : '',
-  ].filter(Boolean).join(' · ');
-  return <div className="opportunity"><div className="opp-sigil" style={item.tone === 'rose' ? { background: '#f6e4e1', color: '#9d4d46' } : item.tone === 'blue' ? { background: '#e4edf1', color: '#456c7a' } : undefined}>{item.type.includes('LIVE') ? <Star size={17}/> : item.type.includes('CAREER') ? <ArrowUpRight size={17}/> : <Heart size={17}/>}</div><div className="opp-copy"><div className="opp-meta">{item.type} · THROUGH DAY {item.expiresOnDay}{item.city ? ` · ${item.city}` : ''}</div><div className="opp-title">{item.title}</div><p className="opp-detail">{item.detail}</p><div className="opp-reward">{rewards || 'An opportunity to grow your reach'}</div><div className={`opp-requirement ${blocked ? 'blocked' : ''}`}>{blocked || `Cost ${money(-item.cost)}${item.effects.energy ? ` · ${item.effects.energy > 0 ? '+' : ''}${item.effects.energy} energy` : ''}`}</div></div><button className="pill-button small" disabled={Boolean(blocked)} title={blocked ?? 'Accept opportunity'} onClick={() => game.acceptOpportunity(item.id)}>{blocked ? item.city && item.city !== game.currentCity ? 'TRAVEL FIRST' : 'LOCKED' : 'SAY YES'}</button></div>;
+  const gains = [
+    item.effects.cash && item.effects.cash > 0 ? { key: 'cash', label: money(item.effects.cash) } : null,
+    item.effects.fans ? { key: 'fans', label: `+${short(item.effects.fans)} fans` } : null,
+    item.effects.hype ? { key: 'hype', label: `${item.effects.hype > 0 ? '+' : ''}${item.effects.hype} hype` } : null,
+    item.effects.reputation ? { key: 'rep', label: `${item.effects.reputation > 0 ? '+' : ''}${item.effects.reputation} rep` } : null,
+  ].filter(Boolean) as { key: string; label: string }[];
+  const energyCost = item.effects.energy && item.effects.energy < 0 ? -item.effects.energy : 0;
+  const label = blocked ? item.city && item.city !== game.currentCity ? 'Travel first' : 'Locked' : 'Take it';
+  return <article className={`offer-card offer-${item.tone ?? 'gold'}`}>
+    <header className="offer-top"><span className="offer-type">{item.type.toLowerCase()}</span><span className="offer-due mono">Until day {item.expiresOnDay}</span></header>
+    <h3 className="offer-title">{item.title}</h3>
+    <p className="offer-detail">{item.detail}</p>
+    <div className="offer-chips">{gains.map((gain) => <span key={gain.key} className="chip chip-gain">{gain.label}</span>)}</div>
+    <footer className="offer-foot">
+      <CostChips cash={item.cost} energy={energyCost}/>
+      {blocked && <span className="offer-blocked">{blocked}</span>}
+      <button type="button" className={blocked ? 'btn-secondary' : 'btn-primary'} disabled={Boolean(blocked)} onClick={() => game.acceptOpportunity(item.id)}>{label}</button>
+    </footer>
+  </article>;
+}
+
+function CostChips({ cash: cashCost, energy }: { cash: number; energy: number }) {
+  if (!cashCost && !energy) return <span className="chip chip-free">Free</span>;
+  return <span className="cost-chips">{cashCost > 0 && <span className="chip chip-cost"><CashIcon/>{cashCost.toLocaleString()}</span>}{energy > 0 && <span className="chip chip-cost"><EnergyIcon/>{energy}</span>}</span>;
+}
+
+function Postcard({ city, location }: { city: string; location: string }) {
+  const info = cityByName(city);
+  return <figure className="postcard" style={{ backgroundImage: `url(${info.image})` }}>
+    <figcaption><span className="postcard-code mono">{info.code} · {info.region}</span><span className="postcard-name">{city}</span><span className="postcard-here">You’re at {location}</span></figcaption>
+  </figure>;
+}
+
+function TrackRow({ song, index }: { song: Song; index: number }) {
+  const status = song.status === 'RELEASED' ? 'Live' : song.status === 'SCHEDULED' ? `Out day ${song.releaseDay}` : song.status === 'FINISHED' ? 'Mastered' : song.status.charAt(0) + song.status.slice(1).toLowerCase();
+  return <li className={`track track-${song.status.toLowerCase()}`}>
+    <span className="track-n mono">{String(index).padStart(2, '0')}</span>
+    <span className="track-main"><b>{song.title}</b><span>{song.genre} · {song.bpm} BPM</span></span>
+    <span className="track-status">{status}</span>
+    <span className="track-num mono">{song.streams ? short(song.streams) : `Q${song.quality}`}</span>
+  </li>;
 }
 
 function SongSummary({ song }: { song: Song }) {

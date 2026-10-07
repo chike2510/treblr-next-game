@@ -1,0 +1,74 @@
+/* Legacy styles: Reset, root aliases, keyframes, shared type.
+   Split from the old minified globals.css; dead selectors removed. New work goes in the non-legacy files. */
+
+:root {
+  --muted:#6f675d;
+  --cream:#ebe4d6;
+  --line:rgba(21,19,17,.12);
+  --orange:var(--danfo);
+  --amber:var(--danfo);
+  --plum:#2b2825;
+  --deep:#1a1816;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid rgba(245,196,0,.5);
+  outline-offset: 3px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.display {
+  font-family: var(--display);
+}
+
+.eyebrow {
+  font: 600 var(--fs-min) var(--display);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+@keyframes ping {50%{box-shadow:0 0 0 9px rgba(255,173,101,0)}}
+
+@keyframes ring {50%{transform:scale(1.1);opacity:.62}}
+
+@keyframes breathe {50%{transform:scaleY(1.04)}}
+
+@keyframes record-turn {to{transform:rotate(360deg)}}
+
+@media(prefers-reduced-motion:reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto!important;
+    animation-duration: .01ms!important;
+    animation-iteration-count: 1!important;
+    transition-duration: .01ms!important;
+  }
+}

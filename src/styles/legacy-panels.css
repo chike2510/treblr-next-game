@@ -1,0 +1,459 @@
+/* Legacy styles: Modal panels, rows, buttons.
+   Split from the old minified globals.css; dead selectors removed. New work goes in the non-legacy files. */
+
+.avatar-bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg,#ffc780,#e66b4d);
+  color: #331e21;
+  font: 700 var(--fs-min) var(--display);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(18,15,18,.62);
+  backdrop-filter: blur(8px);
+}
+
+.game-panel {
+  width: min(680px,100%);
+  max-height: min(760px,86svh);
+  overflow: auto;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 28px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 35px 100px rgba(0,0,0,.38);
+}
+
+.panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 24px 25px 19px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(251,248,242,.94);
+  backdrop-filter: none;
+}
+
+.panel-head h2 {
+  font: 600 28px/.95 var(--display);
+  letter-spacing: -.02em;
+  margin: 7px 0 0;
+}
+
+.close-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #514849;
+}
+
+.panel-content {
+  padding: 20px 24px 25px;
+}
+
+.opportunity {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 15px 0;
+  border-top: 1px solid var(--line);
+}
+
+.opp-sigil {
+  flex: 0 0 38px;
+  height: 38px;
+  border-radius: var(--r-md);
+  display: grid;
+  place-items: center;
+  background: #f2e6cf;
+  color: #7c5731;
+}
+
+.opp-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.opp-title {
+  font: 600 15px var(--display);
+  letter-spacing: -.02em;
+}
+
+.opp-detail {
+  font-size: var(--fs-min);
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 5px 0;
+}
+
+.pill-button {
+  border: 0;
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--r-pill);
+  padding: 10px 14px;
+  font: 600 var(--fs-min) var(--display);
+  letter-spacing: .04em;
+  white-space: nowrap;
+  transition: .2s;
+}
+
+.pill-button:hover {
+  background: var(--orange);
+  color: #221719;
+  transform: translateY(-1px);
+}
+
+.pill-button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pill-button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.pill-button.orange {
+  background: var(--orange);
+  color: #271719;
+}
+
+.pill-button.small {
+  padding: 9px 11px;
+}
+
+.song-row, .person-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.song-art {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg,#f2b663,#772f3c);
+  display: grid;
+  place-items: center;
+  color: white;
+}
+
+.song-main {
+  flex: 1;
+}
+
+.song-main b {
+  display: block;
+  font: 600 13px var(--display);
+}
+
+.song-main span {
+  font-size: var(--fs-min);
+  color: var(--muted);
+}
+
+.quality-badge {
+  font: 600 var(--fs-min) var(--display);
+  padding: 5px 8px;
+  border-radius: var(--r-pill);
+  background: #efe6d8;
+  color: #785a3f;
+}
+
+.form-label {
+  display: block;
+  margin: 13px 0 6px;
+  font: 600 var(--fs-min) var(--display);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #887a74;
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: #fff;
+  padding: 12px 13px;
+  color: var(--ink);
+  font-size: 12px;
+  outline: none;
+}
+
+.field:focus {
+  border-color: #d28a59;
+  box-shadow: 0 0 0 3px rgba(210,138,89,.14);
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.city-grid {
+  display: grid;
+  grid-template-columns: repeat(2,1fr);
+  gap: 11px;
+}
+
+.meter-line {
+  height: 5px;
+  border-radius: var(--r-md);
+  background: #ede5dc;
+  overflow: hidden;
+}
+
+.meter-line i {
+  height: 100%;
+  display: block;
+  background: linear-gradient(90deg,#f29c63,#d95e48);
+  border-radius: var(--r-md);
+}
+
+.mini-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.mini-stat {
+  padding: 11px 12px;
+  border-radius: var(--r-md);
+  background: #f1ece4;
+}
+
+.mini-stat span {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-min);
+}
+
+.mini-stat b {
+  display: block;
+  font: 600 15px var(--display);
+  margin-top: 4px;
+}
+
+.quote-note {
+  padding: 17px;
+  border-radius: var(--r-md);
+  background: #eee6db;
+  color: #6c5a4d;
+  font-size: var(--fs-min);
+  line-height: 1.6;
+  margin-top: 16px;
+}
+
+@media(max-width:700px) {
+  .avatar-bubble {
+    width: 29px;
+    height: 29px;
+  }
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .game-panel {
+    border-radius: 26px 26px 0 0;
+    max-height: 88svh;
+    width: 100%;
+    padding-bottom: var(--safe-bottom);
+  }
+  .panel-head {
+    padding: 20px 19px 15px;
+  }
+  .panel-head h2 {
+    font-size: 24px;
+  }
+  .panel-content {
+    padding: 15px 19px 22px;
+  }
+  .city-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel-song-list {
+  margin-top: 16px;
+}
+
+.person-row-choices {
+  align-items: flex-start;
+}
+
+.person-note {
+  font-size: var(--fs-min);
+  color: #7d716e;
+  margin-top: 6px;
+}
+
+.person-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.text-button {
+  border: 0;
+  background: transparent;
+  color: #885841;
+  font: 600 var(--fs-min) var(--display);
+  letter-spacing: .04em;
+  padding: 8px;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
+.history-entry {
+  display: flex;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-marker {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-md);
+  background: #f2e6cf;
+  color: #956542;
+  display: grid;
+  place-items: center;
+}
+
+.history-entry-meta {
+  font: 600 var(--fs-min) var(--display);
+  letter-spacing: .04em;
+  color: #9a7355;
+}
+
+.history-entry b {
+  display: block;
+  font: 600 13px var(--display);
+  margin-top: 4px;
+}
+
+.history-entry p {
+  font-size: var(--fs-min);
+  line-height: 1.5;
+  color: #796f6a;
+  margin: 5px 0 0;
+}
+
+.quality-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 15px 0;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: #f4eee6;
+}
+
+.quality-ring {
+  --quality:70%;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(#d7794f var(--quality),#e4d8cc 0);
+  position: relative;
+}
+
+.quality-ring:before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #f4eee6;
+}
+
+.quality-ring b {
+  position: relative;
+  font: 600 12px var(--display);
+}
+
+.quality-preview>div:last-child b {
+  display: block;
+  font: 600 var(--fs-min) var(--display);
+}
+
+.quality-preview>div:last-child span {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-min);
+  line-height: 1.45;
+  color: #7c716b;
+}
+
+.release-controls .field {
+  margin-top: 5px;
+  padding: 10px;
+  font-size: var(--fs-min);
+}
+
+@media(max-width:700px) {
+  .release-controls .field {
+    font-size: var(--fs-min);
+    padding: 9px 6px;
+  }
+}
+
+.panel-local-map {
+  display: grid;
+  grid-template-columns: .72fr 1.28fr;
+  gap: 14px;
+  margin-bottom: 17px;
+  padding: 14px;
+  border: 1px solid #e7ddd0;
+  border-radius: var(--r-md);
+  background: #f2ede5;
+}
+
+.panel-local-map>div:first-child p {
+  font-size: var(--fs-min);
+  color: #70635c;
+  line-height: 1.5;
+}
+
+@media(max-width:700px) {
+  .panel-local-map {
+    padding: 12px;
+  }
+}
