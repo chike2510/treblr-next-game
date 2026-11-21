@@ -24,8 +24,15 @@ import {
   type Song,
   type SongStatus,
 } from './game-rules';
+import {
+  CAMPAIGN_CHANNELS, TRAINING_COSTS, awardDecision, buildAwards, canAcceptIndustryOffer,
+  dailyCareerWork, makeIndustryOffers, campaignPlan, resolveCampaign, eligibleAward, careerWorkOutcome,
+  type CampaignChannel, type SongCampaign, type AlbumProject, type IndustryOffer,
+  type AwardRecord, type CareerWork, type TrainingRecord, type TrainingSkill,
+} from './career-rules';
 
 export type { CampaignTier, Opportunity, Song, SongStatus } from './game-rules';
+export type { CampaignChannel, SongCampaign, AlbumProject, IndustryOffer, AwardRecord, CareerWork, TrainingRecord, TrainingSkill } from './career-rules';
 export type LedgerEntry = { id: string; day: number; description: string; amount: number; balanceAfter: number; bucket: 'cash' | 'bank' };
 export type HistoryEntry = { id: string; day: number; time: string; title: string; detail: string };
 export type RelationshipChoice = 'reply' | 'accept-session' | 'decline' | 'help';
@@ -69,6 +76,15 @@ type PersistentState = {
   memories: MemoryRecord[];
   chapterStage: string;
   lastEvent: string;
+  cityDemand: Record<string, number>;
+  songCampaigns: SongCampaign[];
+  albumProjects: AlbumProject[];
+  industryInbox: IndustryOffer[];
+  awards: AwardRecord[];
+  awardsHistory: AwardRecord[];
+  careerWork: CareerWork[];
+  trainingHistory: TrainingRecord[];
+  skills: Record<TrainingSkill, number>;
 };
 
 export type GameState = PersistentState & {
@@ -87,6 +103,17 @@ export type GameState = PersistentState & {
   archiveSong: (id: string) => void;
   publishPost: (platform: string, text: string, mode?: string) => void;
   acceptOpportunity: (id: string) => void;
+  planCampaign: (songId: string, channel: CampaignChannel, startDay?: number, durationDays?: number) => void;
+  cancelCampaign: (id: string) => void;
+  createAlbumProject: (title: string, songIds: string[]) => void;
+  setAlbumFocusTrack: (projectId: string, songId: string) => void;
+  releaseAlbum: (projectId: string) => void;
+  acceptIndustryOffer: (id: string) => void;
+  declineIndustryOffer: (id: string) => void;
+  submitAward: (awardId: string, songId: string) => void;
+  resolveAwards: () => void;
+  doCareerWork: (type: CareerWork['type']) => void;
+  trainCareer: (skill: TrainingSkill) => void;
   messagePerson: (name: string, choice?: RelationshipChoice) => void;
   dismissEvent: () => void;
   spend: (amount: number, description?: string) => void;
@@ -150,6 +177,14 @@ const initialState: PersistentState = {
   ],
   chapterStage: 'A producer has invited you to a session',
   lastEvent: '',
+  cityDemand: {}, songCampaigns: [], albumProjects: [], industryInbox: [], awards: buildAwards(6, [
+    { id: 's1', title: 'Never Met You', genre: 'Afro-fusion', mood: 'Midnight', bpm: 104, quality: 88, streams: 1240000, status: 'RELEASED', producer: 'Teo Park', releasedOnDay: 2 },
+    { id: 's2', title: 'Lagos Nights', genre: 'Afrobeats', mood: 'Golden hour', bpm: 112, quality: 82, streams: 892000, status: 'RELEASED', producer: 'Teo Park', releasedOnDay: 4 },
+  ], 482000, 78), awardsHistory: [],
+  careerWork: dailyCareerWork(6, 78, [
+    { id: 's1', title: 'Never Met You', genre: 'Afro-fusion', mood: 'Midnight', bpm: 104, quality: 88, streams: 1240000, status: 'RELEASED', producer: 'Teo Park' },
+    { id: 's2', title: 'Lagos Nights', genre: 'Afrobeats', mood: 'Golden hour', bpm: 112, quality: 82, streams: 892000, status: 'RELEASED', producer: 'Teo Park' },
+  ]), trainingHistory: [], skills: { VOCALS: 0, SONGWRITING: 0, PERFORMANCE: 0, BUSINESS: 0, PRODUCTION: 0 },
 };
 
 const initialForMigration = initialState as unknown as Record<string, unknown>;
@@ -179,6 +214,15 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     let royalties = 0;
     let newFans = 0;
     const releaseNotes: string[] = [];
+    const completedCampaigns = state.songCampaigns.filter(c => c.status !== 'CANCELLED' && c.endDay < nextDay && c.status !== 'COMPLETED');
+    let campaignFans = 0; let campaignStreams = 0;
+    const songById = (id: string) => state.songs.find(song => song.id === id);
+    const songCampaigns = state.songCampaigns.map(c => {
+      if (!completedCampaigns.some(done => done.id === c.id)) return c.status === 'PLANNED' && c.startDay <= nextDay ? { ...c, status: 'ACTIVE' as const } : c;
+      const song = songById(c.songId); if (!song) return { ...c, status: 'COMPLETED' as const, completedOnDay: nextDay };
+      const outcome = resolveCampaign(c, song, state.fans, state.hype); campaignFans += outcome.fans; campaignStreams += outcome.streams;
+      return { ...c, status: 'COMPLETED' as const, measuredReach: outcome.reach, measuredFans: outcome.fans, measuredStreams: outcome.streams, completedOnDay: nextDay };
+    });
     const songs = state.songs.map((song) => {
       if (song.status === 'SCHEDULED' && song.releaseDay !== undefined && song.releaseDay <= nextDay && canTransitionSong(song.status, 'RELEASED')) {
         const outcome = resolveRelease(song, state.fans, state.hype, state.artist.genre, nextDay);
@@ -196,13 +240,32 @@ export const useGame = create<GameState>()(persist((set, get) => ({
       }
       return song;
     });
-    const monthlyGain = newFans * 2 + Math.round(earnedStreams * 0.012);
+    const monthlyGain = newFans * 2 + Math.round(earnedStreams * 0.012) + campaignFans;
+    const generatedInbox = makeIndustryOffers(nextDay, songs, state.fans + newFans + campaignFans, state.reputation);
+    const inboxIds = new Set(state.industryInbox.map(o => o.id));
+    const completedOffers = state.industryInbox.filter(o => o.status === 'ACCEPTED' && o.acceptedOnDay !== undefined && o.acceptedOnDay < nextDay);
+    const completedIds = new Set(completedOffers.map(o => o.id));
+    const industryInbox = [...state.industryInbox.filter(o => !['EXPIRED', 'COMPLETED'].includes(o.status)).map(o => completedIds.has(o.id) ? { ...o, status: 'COMPLETED' as const, completedOnDay: nextDay } : o), ...generatedInbox.filter(o => !inboxIds.has(o.id))].slice(-30);
     const expired = state.opportunities.filter((offer) => shouldExpireOpportunity(offer, nextDay));
     const opportunities = state.opportunities.filter((offer) => !shouldExpireOpportunity(offer, nextDay));
+    const expiredInbox = state.industryInbox.map(o => o.status === 'OPEN' && o.expiresOnDay < nextDay ? { ...o, status: 'EXPIRED' as const } : o);
+    const completedCash = completedOffers.reduce((sum, o) => sum + o.cashReward, 0);
+    const completedFans = completedOffers.reduce((sum, o) => sum + o.fanReward, 0);
+    const completedRep = completedOffers.reduce((sum, o) => sum + o.reputationReward, 0);
+    const dueAwards = state.awards.filter(a => a.submissionStatus === 'SUBMITTED' && a.ceremonyDay <= nextDay);
+    const resolvedAwards = state.awards.map(a => {
+      if (!dueAwards.some(d => d.id === a.id)) return a;
+      const decision = awardDecision(a, songs.find(s => s.id === a.eligibleSongId), state.fans + newFans + campaignFans + completedFans, state.reputation + completedRep);
+      return { ...a, submissionStatus: decision, decidedOnDay: nextDay, historyNote: `${decision.toLowerCase()} on day ${nextDay}.` };
+    });
+    const awardHistory = resolvedAwards.filter(a => dueAwards.some(d => d.id === a.id));
+
     const time = '8:12 AM';
+    const dailyCash = royalties + completedCash;
     const recap = [
       `Day ${nextDay} in ${state.currentCity}: ${earnedStreams.toLocaleString()} streams`,
       royalties ? `$${royalties.toLocaleString()} royalties earned` : 'No royalty payout yet',
+      completedOffers.length ? `${completedOffers.length} industry offer(s) completed · +$${completedCash.toLocaleString()} · +${completedFans.toLocaleString()} fans · +${completedRep} reputation` : '',
       newFans ? `+${newFans.toLocaleString()} new fans` : '',
       expired.length ? `${expired.length} offer${expired.length > 1 ? 's' : ''} expired` : '',
       ...releaseNotes,
@@ -210,21 +273,27 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     const base = {
       ...state,
       songs,
+      awards: resolvedAwards,
+      awardsHistory: awardHistory.length ? [...awardHistory, ...state.awardsHistory].slice(0, 50) : state.awardsHistory,
+      songCampaigns,
+      industryInbox: [...expiredInbox.filter(o => !generatedInbox.some(n => n.id === o.id) && !completedIds.has(o.id)), ...industryInbox],
+      careerWork: dailyCareerWork(nextDay, state.reputation, songs),
       day: nextDay,
       time,
       energy: clamp(state.energy + 35),
       mood: clamp(state.mood + 5),
       creativity: clamp(state.creativity + 3),
-      fans: state.fans + newFans,
-      monthlyListeners: Math.max(0, state.monthlyListeners + monthlyGain),
+      fans: state.fans + newFans + campaignFans + completedFans,
+      monthlyListeners: Math.max(0, state.monthlyListeners + monthlyGain + Math.round(campaignStreams * 0.02)),
       hype: clamp(state.hype + (releaseNotes.length ? 8 : 0)),
       opportunities,
       chapterStage: releaseNotes.length ? 'Your first release is out; listen for the city’s answer' : state.chapterStage,
-      money: state.money + royalties,
+      money: state.money + royalties + completedCash,
+      reputation: clamp(state.reputation + completedRep),
       lastEvent: recap,
       notifications: addNotice(state, recap),
       history: addHistory(state, `Day ${nextDay} recap`, recap, nextDay, time),
-      ledger: royalties ? ledgerEntry(state, `Day ${nextDay} streaming royalties`, royalties, 'cash', state.money + royalties, nextDay) : state.ledger,
+      ledger: dailyCash ? ledgerEntry(state, completedOffers.length ? `Day ${nextDay} royalties & industry settlements` : `Day ${nextDay} streaming royalties`, dailyCash, 'cash', state.money + dailyCash, nextDay) : state.ledger,
     };
     return base;
   }),
@@ -325,7 +394,7 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     if (!canTransitionSong(song.status, 'DEMO')) return { lastEvent: 'Only an idea can move into a demo. Finish the current stage first.' };
     if (state.energy < 20) return { lastEvent: 'You need 20 energy for a studio take. Rest or eat first.' };
     if (state.money < 125) return { lastEvent: 'The demo session costs $125 cash. Find a way to earn it first.' };
-    const quality = clamp(Math.round(38 + state.creativity * 0.32 + state.energy * 0.22 + (song.genre === state.artist.genre ? 8 : 4) + (song.mood ? 3 : 0)), 40, 95);
+    const quality = clamp(Math.round(38 + state.creativity * 0.32 + state.energy * 0.22 + (song.genre === state.artist.genre ? 8 : 4) + (song.mood ? 3 : 0) + (state.skills.VOCALS ?? 0) * 0.10 + (state.skills.SONGWRITING ?? 0) * 0.10), 40, 95);
     const updated = { ...song, status: 'DEMO' as const, quality, producer: 'You' };
     const next = { ...state, songs: state.songs.map((item) => item.id === id ? updated : item), money: state.money - 125, energy: state.energy - 18, creativity: clamp(state.creativity + 7), chapterStage: 'The demo is down; decide how to finish the record' };
     const detail = `Demo recorded for “${song.title}” · quality ${quality}/100 · $125 · −18 energy.`;
@@ -341,7 +410,8 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     if (state.money < cost) return { lastEvent: `Teo’s mix session costs $${cost}. Choose a self-finish or earn more cash.` };
     if (state.energy < energyCost) return { lastEvent: `You need ${energyCost} energy to finish a record. Rest first.` };
     const boost = producer === 'Teo Park' ? 10 : 5;
-    const updated = { ...song, status: 'FINISHED' as const, producer, quality: clamp(song.quality + boost, 40, 99) };
+    const skillBoost = (state.skills.PRODUCTION ?? 0) * 0.10 + (state.skills.SONGWRITING ?? 0) * 0.05;
+    const updated = { ...song, status: 'FINISHED' as const, producer, quality: clamp(Math.round(song.quality + boost + skillBoost), 40, 99) };
     const next = { ...state, songs: state.songs.map((item) => item.id === id ? updated : item), money: state.money - cost, energy: state.energy - energyCost, chapterStage: 'The master is ready; choose a release date and rollout' };
     const detail = `“${song.title}” is finished with ${producer === 'Teo Park' ? 'Teo Park' : 'a self-mix'} · quality ${updated.quality}/100${cost ? ` · −$${cost}` : ''} · −${energyCost} energy.`;
     const rels = producer === 'Teo Park' ? next.relationships.map((person) => person.name === 'Teo Park' ? { ...person, trust: clamp(person.trust + 5), note: `You finished “${song.title}” together. The master is ready.` } : person) : next.relationships;
@@ -414,6 +484,7 @@ export const useGame = create<GameState>()(persist((set, get) => ({
       eventNight,
       passes: pass ? [pass, ...state.passes].slice(0, 20) : state.passes,
       chapterStage: offer.id === 'festival' ? 'The crowd has heard you; carry that momentum into the next release' : state.chapterStage,
+      cityDemand: offer.id === 'festival' ? { ...state.cityDemand, Lagos: Math.min(100, (state.cityDemand.Lagos ?? 0) + 1) } : state.cityDemand,
     };
     const parts = [
       offer.effects.cash ? `${offer.effects.cash > 0 ? '+' : '−'}$${Math.abs(offer.effects.cash).toLocaleString()} cash` : '',
@@ -445,6 +516,29 @@ export const useGame = create<GameState>()(persist((set, get) => ({
     const detail = choice === 'accept-session' ? `You booked a session with ${name}. −$210 · −12 energy · trust +8.` : choice === 'help' ? `You made time to help ${name}. −8 energy · trust +8.` : choice === 'decline' ? `You declined ${name}’s invitation without burning the bridge. Trust −2.` : `You replied to ${name}. Trust +4; the conversation stays open.`;
     return { ...next, ...recordEvent(next, `Message · ${name}`, detail, `You sent ${name} a message.`), ledger: cost ? ledgerEntry(state, `Session deposit · ${name}`, -cost, 'cash', state.money - cost) : state.ledger };
   }),
+  planCampaign: (songId, channel, startDay = get().day, durationDays = CAMPAIGN_CHANNELS[channel]?.days ?? 1) => set((state) => {
+    const song = state.songs.find(s => s.id === songId); const profile = CAMPAIGN_CHANNELS[channel];
+    if (!song || !profile) return { lastEvent: 'Choose a real released song and campaign channel.' };
+    if (song.status !== 'RELEASED') return { lastEvent: 'Campaigns require a released song.' };
+    if (state.songCampaigns.some(c => c.songId === songId && ['PLANNED','ACTIVE'].includes(c.status))) return { lastEvent: 'That song already has an active campaign.' };
+    const plan = campaignPlan(song, channel, Math.max(state.day, Math.floor(startDay)), durationDays, state.fans, state.hype, `campaign-${songId}-${channel}-${state.day}`, state.skills.BUSINESS);
+    plan.status = plan.startDay === state.day ? 'ACTIVE' : 'PLANNED';
+    if (plan.startDay > state.day + 14) return { lastEvent: 'Campaigns can only be planned within the next 14 days.' };
+    if (state.money < plan.cost) return { lastEvent: `You need $${plan.cost.toLocaleString()} cash for this campaign.` };
+    if (state.energy < plan.energyCost) return { lastEvent: `You need ${plan.energyCost} energy for this campaign.` };
+    const next = { ...state, money: state.money - plan.cost, energy: state.energy - plan.energyCost, songCampaigns: [plan, ...state.songCampaigns].slice(0, 30) };
+    return { ...next, ...recordEvent(next, `Campaign planned · ${song.title}`, `${channel} campaign for “${song.title}” · ${plan.durationDays} day(s) · forecast ${plan.expectedReach.toLocaleString()} reach.`), ledger: plan.cost ? ledgerEntry(state, `${channel} campaign · ${song.title}`, -plan.cost, 'cash', next.money) : state.ledger };
+  }),
+  cancelCampaign: (id) => set((state) => { const c = state.songCampaigns.find(x => x.id === id); if (!c || !['PLANNED','ACTIVE'].includes(c.status)) return { lastEvent: 'That campaign is no longer cancellable.' }; return { songCampaigns: state.songCampaigns.map(x => x.id === id ? { ...x, status: 'CANCELLED' as const } : x), lastEvent: 'Campaign cancelled; past spend is not refunded.' }; }),
+  createAlbumProject: (title, songIds) => set((state) => { const ids = [...new Set(songIds)].filter(id => state.songs.some(s => s.id === id && s.status !== 'ARCHIVED')).slice(0, 12); const name = title.trim().slice(0, 60); if (!name || ids.length < 2) return { lastEvent: 'An album needs a title and at least two catalogue songs.' }; const project: AlbumProject = { id: `album-${state.day}-${Date.now()}`, title: name, songIds: ids, status: 'PLANNING', createdOnDay: state.day, budget: ids.length * 180, spent: 0, quality: Math.round(ids.reduce((n, id) => n + (state.songs.find(s => s.id === id)?.quality ?? 0), 0) / ids.length) }; return { albumProjects: [project, ...state.albumProjects].slice(0, 10), lastEvent: `Album project created · ${name}.` }; }),
+  setAlbumFocusTrack: (projectId, songId) => set((state) => { const p = state.albumProjects.find(x => x.id === projectId); if (!p || !p.songIds.includes(songId) || !state.songs.some(s => s.id === songId)) return { lastEvent: 'The focus track must be an actual song on that album.' }; return { albumProjects: state.albumProjects.map(x => x.id === projectId ? { ...x, focusTrackId: songId, ...(x.status === 'RELEASED' ? {} : { status: 'IN_PROGRESS' as const }) } : x), lastEvent: 'Album focus track selected.' }; }),
+  releaseAlbum: (projectId) => set((state) => { const p = state.albumProjects.find(x => x.id === projectId); if (!p) return { lastEvent: 'That album project is not in this save.' }; if (p.status === 'RELEASED' || p.status === 'CANCELLED') return { lastEvent: 'This album project can no longer be released.' }; if (!p.focusTrackId || !p.songIds.includes(p.focusTrackId)) return { lastEvent: 'Choose an album focus track first.' }; const projectSongs = p.songIds.map(id => state.songs.find(s => s.id === id)); if (projectSongs.some(s => !s || s.status !== 'RELEASED')) return { lastEvent: 'Every album song must already be released before the album can release.' }; if (state.money < p.budget) return { lastEvent: `You need $${p.budget.toLocaleString()} cash to release this album.` }; const next = { ...state, money: state.money - p.budget, albumProjects: state.albumProjects.map(x => x.id === projectId ? { ...x, status: 'RELEASED' as const, spent: x.budget, targetReleaseDay: state.day } : x), hype: clamp(state.hype + 8), reputation: clamp(state.reputation + 3) }; return { ...next, ...recordEvent(next, `Album released · ${p.title}`, `${p.title} is out with ${p.songIds.length} released tracks and ${p.focusTrackId} as focus.`), ledger: ledgerEntry(state, `Album release · ${p.title}`, -p.budget, 'cash', next.money) }; }),
+  acceptIndustryOffer: (id) => set((state) => { const o = state.industryInbox.find(x => x.id === id); if (!o) return { lastEvent: 'That inbox offer is gone.' }; const blocked = canAcceptIndustryOffer(o, state.day, state.money, state.energy, state.fans, state.reputation, state.songs); if (blocked) return { lastEvent: blocked }; const next = { ...state, money: state.money - o.cashCost, energy: state.energy - o.energyCost, industryInbox: state.industryInbox.map(x => x.id === id ? { ...x, status: 'ACCEPTED' as const, acceptedOnDay: state.day } : x) }; return { ...next, ...recordEvent(next, `Inbox accepted · ${o.title}`, `Accepted ${o.title}. Costs paid now: −$${o.cashCost.toLocaleString()} · −${o.energyCost} energy. Rewards settle on the next day.`), ledger: o.cashCost ? ledgerEntry(state, `${o.title} acceptance cost`, -o.cashCost, 'cash', next.money) : state.ledger }; }),
+  declineIndustryOffer: (id) => set((state) => { const o = state.industryInbox.find(x => x.id === id); if (!o || o.status !== 'OPEN') return { lastEvent: 'That inbox offer is no longer open.' }; return { industryInbox: state.industryInbox.map(x => x.id === id ? { ...x, status: 'DECLINED' as const } : x), lastEvent: `Declined · ${o.title}.` }; }),
+  submitAward: (awardId, songId) => set((state) => { const a = state.awards.find(x => x.id === awardId); const song = state.songs.find(x => x.id === songId); if (!a || a.submissionStatus !== 'ELIGIBLE' || a.eligibleSongId || !song || !state.songs.some(s => s.id === songId) || !eligibleAward(song, state.fans, state.reputation)) return { lastEvent: 'That song is not eligible for this award submission.' }; return { awards: state.awards.map(x => x.id === awardId ? { ...x, eligibleSongId: songId, submissionStatus: 'SUBMITTED' as const, submittedOnDay: state.day, historyNote: `Submitted by player for ${song.title}.` } : x), lastEvent: `Award submission sent for ${song.title}.` }; }),
+  resolveAwards: () => set((state) => { const due = state.awards.filter(a => a.ceremonyDay <= state.day && a.submissionStatus === 'SUBMITTED'); if (!due.length) return { lastEvent: 'No award decisions are due yet.' }; const awards = state.awards.map(a => { const song = state.songs.find(s => s.id === a.eligibleSongId); const decision = due.some(d => d.id === a.id) ? awardDecision(a, song, state.fans, state.reputation) : a.submissionStatus; return due.some(d => d.id === a.id) ? { ...a, submissionStatus: decision, decidedOnDay: state.day, historyNote: `${decision.toLowerCase()} on day ${state.day}.` } : a; }); const decisions = awards.filter(a => due.some(d => d.id === a.id)); return { awards, awardsHistory: [...decisions, ...state.awardsHistory].slice(0, 50), lastEvent: `Awards resolved · ${decisions.map(a => `${a.name}: ${a.submissionStatus.toLowerCase()}`).join(', ')}.` }; }),
+  doCareerWork: (type) => set((state) => { const job = state.careerWork.find(w => w.type === type && w.status === 'AVAILABLE'); if (!job) return { lastEvent: 'That work slot is not available today.' }; if (state.energy < job.energyCost) return { lastEvent: `You need ${job.energyCost} energy for that job.` }; const skill = careerWorkOutcome(job, state.skills); const next = { ...state, time: addClockMinutes(state.time, job.durationHours * 60), money: state.money + job.cashReward, energy: state.energy - job.energyCost, reputation: clamp(state.reputation + job.reputationReward), skills: { ...state.skills, [skill.skill]: skill.skillAfter }, careerWork: state.careerWork.map(w => w.id === job.id ? { ...w, status: 'COMPLETED' as const } : w) }; return { ...next, ...recordEvent(next, `Work completed · ${job.title}`, `Earned $${job.cashReward.toLocaleString()} · −${job.energyCost} energy · ${job.durationHours} hours used · +${skill.skillGain} ${skill.skill.toLowerCase()} skill.`), ledger: ledgerEntry(state, job.title, job.cashReward, 'cash', next.money) }; }),
+  trainCareer: (skill) => set((state) => { const c = TRAINING_COSTS[skill]; if (!c) return { lastEvent: 'Choose a valid training skill.' }; if (state.money < c.cash || state.energy < c.energy) return { lastEvent: `Training needs $${c.cash} and ${c.energy} energy.` }; const before = clamp(state.skills[skill] ?? 0); const gain = Math.max(0, Math.min(8, 3 + Math.floor(state.creativity / 30), 100 - before)); const next = { ...state, money: state.money - c.cash, energy: state.energy - c.energy, skills: { ...state.skills, [skill]: before + gain }, trainingHistory: [{ id: `training-${skill}-${state.day}-${Date.now()}`, skill, day: state.day, cashCost: c.cash, energyCost: c.energy, skillGain: gain }, ...state.trainingHistory].slice(0, 100) }; return { ...next, ...recordEvent(next, `Training · ${skill.toLowerCase()}`, `Skill +${gain} (now ${before + gain}/100) · −$${c.cash} · −${c.energy} energy.`), ledger: ledgerEntry(state, `Training · ${skill}`, -c.cash, 'cash', next.money) }; }),
   dismissEvent: () => set({ lastEvent: '' }),
   spend: (amount, description = 'A little something for the next chapter') => set((state) => {
     const cost = Math.max(0, Math.floor(amount));
@@ -479,11 +573,11 @@ export const useGame = create<GameState>()(persist((set, get) => ({
   reset: () => set({ ...initialState }),
 }), {
   name: 'treblr-world-save-v1',
-  version: 3,
+  version: 4,
   storage: createJSONStorage(() => localStorage),
   migrate: (persisted, _version) => migrateSaveData(persisted, initialForMigration, opportunityCatalog) as unknown as GameState,
   partialize: (state) => {
-    const { sleep: _sleep, advanceDay: _advanceDay, eat: _eat, travel: _travel, travelLocally: _travelLocally, shareEventPlan: _shareEventPlan, saveEventMemory: _saveEventMemory, buyBoutiqueItem: _buyBoutiqueItem, createIdea: _createIdea, recordSong: _recordSong, finishSong: _finishSong, scheduleSong: _scheduleSong, archiveSong: _archiveSong, publishPost: _publishPost, acceptOpportunity: _acceptOpportunity, messagePerson: _messagePerson, dismissEvent: _dismissEvent, spend: _spend, transferMoney: _transferMoney, reset: _reset, ...data } = state;
+    const { sleep: _sleep, advanceDay: _advanceDay, eat: _eat, travel: _travel, travelLocally: _travelLocally, shareEventPlan: _shareEventPlan, saveEventMemory: _saveEventMemory, buyBoutiqueItem: _buyBoutiqueItem, createIdea: _createIdea, recordSong: _recordSong, finishSong: _finishSong, scheduleSong: _scheduleSong, archiveSong: _archiveSong, publishPost: _publishPost, acceptOpportunity: _acceptOpportunity, planCampaign: _planCampaign, cancelCampaign: _cancelCampaign, createAlbumProject: _createAlbumProject, setAlbumFocusTrack: _setAlbumFocusTrack, releaseAlbum: _releaseAlbum, acceptIndustryOffer: _acceptIndustryOffer, declineIndustryOffer: _declineIndustryOffer, submitAward: _submitAward, resolveAwards: _resolveAwards, doCareerWork: _doCareerWork, trainCareer: _trainCareer, messagePerson: _messagePerson, dismissEvent: _dismissEvent, spend: _spend, transferMoney: _transferMoney, reset: _reset, ...data } = state;
     return data as GameState;
   },
 }));

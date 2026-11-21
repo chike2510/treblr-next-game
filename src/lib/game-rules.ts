@@ -118,6 +118,7 @@ export type OpportunityCheck = {
   currentCity: string;
   day: number;
   money: number;
+  energy?: number;
   reputation: number;
   songs: Song[];
   currentLocation?: string;
@@ -161,6 +162,7 @@ export function opportunityBlockReason(opportunity: Opportunity, state: Opportun
     return `Requires a ${opportunity.requirements.songStatus.toLowerCase()} in your catalogue.`;
   }
   if (state.money < opportunity.cost) return `You need $${opportunity.cost.toLocaleString()} cash for this offer.`;
+  if (state.energy !== undefined && opportunity.effects.energy < 0 && state.energy < Math.abs(opportunity.effects.energy)) return `You need ${Math.abs(opportunity.effects.energy)} energy for this offer.`;
   return null;
 }
 
@@ -263,6 +265,29 @@ export function migrateSaveData<T extends Record<string, unknown>>(
     eventNight,
     passes,
     memories,
+    cityDemand: saved.cityDemand && typeof saved.cityDemand === "object" && !Array.isArray(saved.cityDemand)
+      ? Object.fromEntries(Object.entries(saved.cityDemand as Record<string, unknown>).filter(([city, value]) => typeof city === "string" && Number.isFinite(Number(value))).map(([city, value]) => [city, clamp(Number(value), 0, 100)]))
+      : (defaults.cityDemand ?? {}),
+    songCampaigns: Array.isArray(saved.songCampaigns) ? saved.songCampaigns.filter((item) => item && typeof item === "object" && !Array.isArray(item)).map((item) => {
+      const campaign = item as Record<string, unknown>;
+      const channel = String(campaign.channel ?? "");
+      const totals: Record<string, { cost: number; energy: number }> = { video: { cost: 420, energy: 12 }, radio: { cost: 300, energy: 8 }, press: { cost: 120, energy: 5 }, interview: { cost: 80, energy: 4 }, creator: { cost: 240, energy: 7 }, live: { cost: 180, energy: 15 } };
+      const total = totals[channel];
+      return total ? { ...campaign, cost: total.cost, energyCost: total.energy } : campaign;
+    }) : (defaults.songCampaigns ?? []),
+    albumProjects: Array.isArray(saved.albumProjects) ? saved.albumProjects.filter((item) => item && typeof item === "object" && !Array.isArray(item)) : (defaults.albumProjects ?? []),
+    industryInbox: Array.isArray(saved.industryInbox) ? saved.industryInbox.filter((item) => item && typeof item === "object" && !Array.isArray(item)) : (defaults.industryInbox ?? []),
+    awards: Array.isArray(saved.awards) ? saved.awards.filter((item) => item && typeof item === "object" && !Array.isArray(item)).map((item) => {
+      const award = item as Record<string, unknown>;
+      // Old builds created calls as SUBMITTED before the player chose a song.
+      return award.submissionStatus === "SUBMITTED" && !award.eligibleSongId ? { ...award, submissionStatus: "ELIGIBLE", submittedOnDay: undefined, historyNote: "Eligible call restored; player decision required." } : award;
+    }) : (defaults.awards ?? []),
+    awardsHistory: Array.isArray(saved.awardsHistory) ? saved.awardsHistory.filter((item) => item && typeof item === "object" && !Array.isArray(item)) : (defaults.awardsHistory ?? []),
+    careerWork: Array.isArray(saved.careerWork) ? saved.careerWork.filter((item) => item && typeof item === "object" && !Array.isArray(item)) : (defaults.careerWork ?? []),
+    trainingHistory: Array.isArray(saved.trainingHistory) ? saved.trainingHistory.filter((item) => item && typeof item === "object" && !Array.isArray(item)) : (defaults.trainingHistory ?? []),
+    skills: saved.skills && typeof saved.skills === "object" && !Array.isArray(saved.skills)
+      ? { ...(defaults.skills as Record<string, unknown> ?? {}), ...Object.fromEntries(Object.entries(saved.skills as Record<string, unknown>).map(([key, value]) => [key, clamp(Number(value), 0, 100)])) }
+      : (defaults.skills ?? {}),
     relationships: Array.isArray(saved.relationships) ? saved.relationships : defaults.relationships,
     notifications: Array.isArray(saved.notifications) ? saved.notifications.slice(0, 8) : defaults.notifications,
     posts: Array.isArray(saved.posts) ? saved.posts : defaults.posts,

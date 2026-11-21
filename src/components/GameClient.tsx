@@ -1,16 +1,18 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Activity, ArrowRight, ArrowUpRight, Bell, BedDouble, CalendarDays, Check, ChevronRight, CircleDollarSign, Compass, Flame, Heart, MapPin, Music2, ScrollText, Sparkles, Star, Sun, Smartphone, Users, Wallet, X, Moon } from 'lucide-react';
+import { Activity, ArrowRight, ArrowUpRight, Bell, BedDouble, CalendarDays, Check, ChevronRight, CircleDollarSign, Compass, Flame, Heart, Inbox, MapPin, Music2, ScrollText, Sparkles, Star, Sun, Smartphone, UserRound, Users, Wallet, X, Moon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import Phone from '@/components/Phone';
 import { LagosMapSketch } from '@/components/PhoneScreens';
 import EventNightFlow from '@/components/EventNightFlow';
+import ArtistProfile from '@/components/ArtistProfile';
 import WorldRoom, { roomSpots } from '@/components/WorldRoom';
 import { CAMPAIGN_PLANS, opportunityBlockReason, type Opportunity, type Song } from '@/lib/game-rules';
 import { useGame } from '@/lib/game';
+import { useTourStore } from '@/lib/tour';
 import { CITIES, TRAVEL_CASH, TRAVEL_ENERGY, cityByName } from '@/lib/cities';
 import { CashIcon, EnergyIcon } from '@/components/CostChips';
 
@@ -68,6 +70,7 @@ function Panel({ kind, close }: { kind: PanelKey; close: () => void }) {
           <div className="panel-song-list">{game.songs.filter((song) => song.status !== 'ARCHIVED').slice(0, 3).map((song) => <SongSummary key={song.id} song={song}/>)}</div>
         </>}
         {kind === 'career' && <>
+          <Link className="btn-primary studio-open-link" href="/career" onClick={close}>Open career headquarters <ArrowUpRight size={15}/></Link>
           {game.opportunities.length ? <div className="offer-stack">{game.opportunities.map((offer) => <OfferCard key={offer.id} item={offer}/>)}</div> : <div className="empty-note">No offers right now. Make a song or meet someone.</div>}
           <div className="mini-stat-grid"><div className="mini-stat"><span>REPUTATION</span><b>{game.reputation}/100</b></div><div className="mini-stat"><span>HYPE</span><b>{game.hype}%</b></div><div className="mini-stat"><span>CONTACTS</span><b>{game.relationships.length}</b></div></div>
         </>}
@@ -89,14 +92,15 @@ function Panel({ kind, close }: { kind: PanelKey; close: () => void }) {
         {kind === 'music' && <>
           <div className="mini-stat-grid"><div className="mini-stat"><span>LISTENERS / MO</span><b>{short(game.monthlyListeners)}</b></div><div className="mini-stat"><span>FANS</span><b>{short(game.fans)}</b></div><div className="mini-stat"><span>EST. ROYALTIES</span><b>{cash(projectedRoyalties(game.songs, game.fans, game.hype))}/day</b></div></div>
           <ol className="tracklist">{game.songs.map((song, index) => <TrackRow key={song.id} song={song} index={index + 1}/>)}</ol>
+          <Link className="btn-secondary studio-open-link" href="/career?tab=music" onClick={close}>Song details &amp; projects <ArrowUpRight size={15}/></Link>
           <Link className="btn-primary studio-open-link" href="/studio" onClick={close}>Open studio <ArrowUpRight size={15}/></Link>
         </>}
         {kind === 'team' && <>{game.relationships.map((person) => <div className="person-row person-row-choices" key={person.name}><div className="avatar-bubble">{person.avatar}</div><div className="song-main"><b>{person.name}</b><span>{person.role} · Trust {person.trust}</span><div className="meter-line" style={{ marginTop: 8 }}><i style={{ width: `${person.trust}%` }}/></div><div className="person-note">{person.note}</div><div className="person-actions"><button className="pill-button small" onClick={() => game.messagePerson(person.name, 'reply')}>Reply</button><button className="pill-button ghost small" disabled={person.name === 'Teo Park' && game.currentCity !== 'Lagos' || game.money < 210 || game.energy < 12} onClick={() => game.messagePerson(person.name, 'accept-session')}>Session · $210</button><button className="pill-button ghost small" disabled={game.energy < 8} onClick={() => game.messagePerson(person.name, 'help')}>Help · 8 energy</button><button className="text-button" onClick={() => game.messagePerson(person.name, 'decline')}>Pass</button></div></div></div>)}</>}
         {kind === 'notifications' && <>{game.notifications.map((note, index) => <div className="opportunity" key={`${note}-${index}`}><div className="opp-sigil"><Bell size={16}/></div><div className="opp-copy"><div className="opp-title">{note}</div><div className="opp-detail">Recent notification · {index === 0 ? 'just now' : `${index + 1} in your history`}</div></div><ChevronRight size={16} color="#988b83"/></div>)}<button className="pill-button ghost" onClick={() => { close(); window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-treblr-history')), 30); }}>Open your story</button></>}
         {kind === 'history' && <>{game.history.length ? game.history.map((entry) => <article className="history-entry" key={entry.id}><div className="history-marker"><Activity size={13}/></div><div><div className="history-entry-meta">DAY {entry.day} · {entry.time}</div><b>{entry.title}</b><p>{entry.detail}</p></div></article>) : <div className="quote-note">Your next choice will start the activity history.</div>}</>}
-        {kind === 'profile' && <><div className="mini-stat-grid"><div className="mini-stat"><span>AUDIENCE</span><b>{short(game.fans)}</b></div><div className="mini-stat"><span>MONTHLY LISTENERS</span><b>{short(game.monthlyListeners)}</b></div><div className="mini-stat"><span>REPUTATION</span><b>{game.reputation}</b></div></div><div className="quote-note">{game.artist.name} is a {game.artist.genre.toLowerCase()} artist. Born in {game.artist.origin}; currently in {game.currentCity}.</div></>}
+        {kind === 'profile' && <ArtistProfile/>}
         {kind === 'shop' && <>{['Studio headphones', 'Tour-ready jacket', 'Worn-in stage boots'].map((item, index) => { const price = [320, 550, 240][index]; return <div className="person-row" key={item}><div className="song-art"><Star size={18}/></div><div className="song-main"><b>{item}</b><span>{['Closed-back, studio grade', 'Heavy denim, tour ready', 'Worn-in leather'][index]}</span></div><button className="pill-button small" disabled={game.money < price} onClick={() => game.spend(price, `Boutique · ${item}`)}>${price}</button></div>; })}</>}
-        {kind === 'settings' && <><div className="person-row"><div className="opp-sigil"><Sparkles size={18}/></div><div className="song-main"><b>Start a new story</b><span>Back to day 1 in Lagos with Candelar.</span></div><button className="pill-button small" onClick={() => { if (window.confirm('Start a new story? This will clear the saved progress in this browser.')) { game.reset(); close(); } }}>Reset</button></div><div className="empty-note">TREBLR is fiction. Your save lives on this device, and no social account, stream or listener here is real.</div></>}
+        {kind === 'settings' && <><div className="person-row"><div className="opp-sigil"><Sparkles size={18}/></div><div className="song-main"><b>Start a new story</b><span>Return to the opening chapter in Lagos.</span></div><button className="pill-button small" onClick={() => { if (window.confirm('Start a new story? This will clear the saved progress in this browser.')) { game.reset(); useTourStore.setState({ setlists: [], bookings: [] }); close(); } }}>Reset</button></div><div className="empty-note">TREBLR is fiction. Your save lives on this device, and no social account, stream or listener here is real.</div></>}
       </div>
     </motion.section>
   </div>;
@@ -164,6 +168,9 @@ export default function GameClient() {
   const router = useRouter();
   useEffect(() => { void useGame.persist.rehydrate(); }, []);
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('panel') === 'event-night') setPanel('event-night');
+  }, []);
+  useEffect(() => {
     if (game.lastEvent) { setToast(game.lastEvent); const timer = window.setTimeout(() => { setToast(''); game.dismissEvent(); }, 4300); return () => window.clearTimeout(timer); }
   }, [game.lastEvent, game.dismissEvent]);
   useEffect(() => {
@@ -182,10 +189,12 @@ export default function GameClient() {
     if (name === 'wardrobe') return setPanel('shop');
     if (name === 'local') return setPanel(game.currentCity === 'Atlanta' ? 'career' : 'team');
   };
-  const openNav = (key: 'home' | 'world' | 'music' | 'career' | 'phone' | 'studio' | 'history') => {
+  const openNav = (key: 'home' | 'world' | 'music' | 'career' | 'phone' | 'studio' | 'history' | 'inbox' | 'profile') => {
     if (key === 'home') { setPanel(null); setPhoneOpen(false); return; }
     if (key === 'phone') { setPhoneOpen(true); return; }
     if (key === 'studio') { router.push('/studio'); return; }
+    if (key === 'inbox') { router.push('/career?tab=inbox'); return; }
+    if (key === 'profile') { setPanel('profile'); return; }
     if (key === 'history') { setPanel('history'); return; }
     setPanel(key === 'world' ? 'world' : key === 'music' ? 'music' : 'career');
   };
@@ -242,10 +251,10 @@ export default function GameClient() {
     </div>
     <nav className="bottom-nav" aria-label="Game navigation">
       <button className="nav-item active" onClick={() => openNav('home')}><BedDouble/><span>Home</span></button>
-      <button className="nav-item" onClick={() => openNav('world')}><Compass/><span>World</span></button>
+      <button className="nav-item" onClick={() => openNav('world')}><Compass/><span>Explore</span></button>
       <button className="nav-item" onClick={() => openNav('studio')}><Music2/><span>Create</span></button>
-      <button className="nav-item" onClick={() => openNav('music')}><Activity/><span>Music</span></button>
-      <button className="nav-item" onClick={() => openNav('career')}><CalendarDays/><span>Career</span></button>
+      <button className="nav-item" onClick={() => openNav('inbox')}><Inbox/><span>Inbox</span></button>
+      <button className="nav-item" onClick={() => openNav('profile')}><UserRound/><span>You</span></button>
       <button className={`nav-item phone-nav${phoneOpen ? ' is-open' : ''}`} onClick={() => openNav('phone')} aria-expanded={phoneOpen} aria-controls="in-game-phone"><Smartphone/><span>Phone</span></button>
     </nav>
     <Phone open={phoneOpen} setOpen={setPhoneOpen} onPanel={(value) => { setPhoneOpen(false); setPanel(value as PanelKey); }}/>
